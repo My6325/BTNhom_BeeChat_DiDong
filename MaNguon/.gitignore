@@ -1,15 +1,29 @@
+# Các file build của Gradle
+.gradle/
+build/
+/*/build/
+
+# Các file cấu hình của Android Studio và IntelliJ
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# Các file tạm và log hệ thống
 local.properties
+.DS_Store
+captures/
+.externalNativeBuild
+.cxx/
+*.swp
+*~
+
+# File máy ảo (nếu bạn có lưu trong folder dự án)
+*.hprof
+
+# Cấu hình Firebase (nếu dự án của bạn có dùng)
+google-services.json
