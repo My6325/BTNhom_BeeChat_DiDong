@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Bee Chats</string>
+    <string name="Bee">Bee</string>
+    <string name="Chat">Chat</string>
+    <string name="BeeChat">BeeChat</string>
+    <string name="TiepTheo">Tiếp theo</string>
+    <string name="BatDau">Bắt đầu với BeeChat</string>
+    <string name="introduce">Xóa nhòa khoảng cách địa lý\nBeeChat mang người thân yêu đến\nbên bạn như những chú ong chăm chỉ</string>
+    <string name="introduce_qr">Kết nối với người thân yêu qua\n QR code tên tài khoản</string>
+    <string name="introduce_setting">Cá nhân hóa trải nghiệm\n theo sở thích riêng trong Cài đặt</string>
+    <string name="introduce_mail">Cùng người thân yêu của bạn\n bắt đầu trò chuyện</string>
 </resources>

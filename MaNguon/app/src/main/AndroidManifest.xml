@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BeeChats">
         <activity
-            android:name=".MainActivity"
+            android:name=".Welcome_Activity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -20,6 +20,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".Introduce_Activity" android:exported="false" />
+        <activity android:name=".Introduce_QR" android:exported="false" />
+        <activity android:name=".Introduce_Setting" android:exported="false" />
+        <activity android:name=".Introduce_Mail" android:exported="false" />
     </application>
 
 </manifest>
