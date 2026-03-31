@@ -9,4 +9,6 @@
     <string name="introduce_qr">Kết nối với người thân yêu qua\n QR code tên tài khoản</string>
     <string name="introduce_setting">Cá nhân hóa trải nghiệm\n theo sở thích riêng trong Cài đặt</string>
     <string name="introduce_mail">Cùng người thân yêu của bạn\n bắt đầu trò chuyện</string>
+    <string name="email_sdt">Email hoặc số điện thoại</string>
+    <string name="gmail">example@gmail.com</string>
 </resources>

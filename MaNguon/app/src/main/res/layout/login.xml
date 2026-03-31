@@ -6,10 +6,25 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context=".Login_Activity"
     android:background="@color/yellow"
+    android:orientation="vertical"
     android:gravity="center">
     <ImageView
         android:layout_width="240dp"
         android:layout_height="240dp"
         android:src="@drawable/bee_logo_cut"/>
-
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/email_sdt"
+        android:textColor="@color/black"
+        android:textStyle="bold"
+        android:textSize="19sp"/>
+    <EditText
+        android:id="@+id/edtEmail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_khung"
+        android:hint="@string/gmail"
+        android:textSize="19sp"
+        android:padding="15dp"/>
 </LinearLayout>
