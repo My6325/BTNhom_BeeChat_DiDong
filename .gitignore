@@ -27,3 +27,5 @@ captures/
 
 # Cấu hình Firebase (nếu dự án của bạn có dùng)
 google-services.json
+# Các loại file khác
+BAO_CAO_DU_AN.md
