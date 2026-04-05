@@ -24,6 +24,7 @@
         <activity android:name=".Introduce_QR" android:exported="false" />
         <activity android:name=".Introduce_Setting" android:exported="false" />
         <activity android:name=".Introduce_Mail" android:exported="false" />
+        <activity android:name=".Login_Activity" />
     </application>
 
 </manifest>
