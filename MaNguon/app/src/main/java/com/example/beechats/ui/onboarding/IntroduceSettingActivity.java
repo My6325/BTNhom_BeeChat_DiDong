@@ -1,4 +1,4 @@
-package com.example.beechats;
+package com.example.beechats.ui.onboarding;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -6,7 +6,9 @@ import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-public class Introduce_Setting extends AppCompatActivity {
+import com.example.beechats.R;
+
+public class IntroduceSettingActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -16,11 +18,9 @@ public class Introduce_Setting extends AppCompatActivity {
         btnNext.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent=new Intent(Introduce_Setting.this,Introduce_Mail.class);
-                // Flag này giúp loại bỏ hiệu ứng chuyển tiếp giữa các Activity
+                Intent intent=new Intent(IntroduceSettingActivity.this, IntroduceMailActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                 startActivity(intent);
-                //Gọi để không có hiệu ứng mặc định
                 overridePendingTransition(0, 0);
                 finish();
             }
