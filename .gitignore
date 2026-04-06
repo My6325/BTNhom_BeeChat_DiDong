@@ -29,3 +29,7 @@ captures/
 google-services.json
 # Các loại file khác
 BAO_CAO_DU_AN.md
+FIREBASE_DATABASE_DESIGN.md
+.github/
+doanchatcli.txt
+PLAN.md
