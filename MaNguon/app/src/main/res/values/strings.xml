@@ -10,5 +10,12 @@
     <string name="introduce_setting">Cá nhân hóa trải nghiệm\n theo sở thích riêng trong Cài đặt</string>
     <string name="introduce_mail">Cùng người thân yêu của bạn\n bắt đầu trò chuyện</string>
     <string name="email_sdt">Email hoặc số điện thoại</string>
+    <string name="mat_khau">Mật khẩu</string>
+    <string name="quen_mk">Quên mật khẩu?</string>
+    <string name="password">password</string>
     <string name="gmail">example@gmail.com</string>
+    <string name="login">Đăng nhập</string>
+    <string name="sign_up">Tạo tài khoản mới</string>
+    <string name="toi_dong_y">Tôi đồng ý với các điều khoản người dùng</string>
+    <string name="dien_email...">Điền email hoặc số điện thoại gắn với tài khoản của bạn để nhận đường dẫn thay đổi mật khẩu</string>
 </resources>

@@ -24,7 +24,10 @@
         <activity android:name=".Introduce_QR" android:exported="false" />
         <activity android:name=".Introduce_Setting" android:exported="false" />
         <activity android:name=".Introduce_Mail" android:exported="false" />
-        <activity android:name=".Login_Activity" />
+        <activity android:name=".Login_Activity" android:exported="false" />
+        <activity android:name=".Register_Activity" android:exported="false" android:windowSoftInputMode="adjustPan"/>
+        <activity android:name=".ForgetPassword" android:exported="false" android:windowSoftInputMode="adjustPan" />
+
     </application>
 
 </manifest>
