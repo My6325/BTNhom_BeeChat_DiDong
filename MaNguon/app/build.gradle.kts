@@ -44,4 +44,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
     implementation("com.google.firebase:firebase-auth") // Cho xác thực
     implementation("com.google.firebase:firebase-firestore") // Cho lưu trữ dữ liệu
+    implementation("com.google.firebase:firebase-messaging") // Cho thông báo đẩy
+    implementation("com.github.bumptech.glide:glide:4.16.0") // Cho tải ảnh
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0") // Cho Glide annotation processing
 }
