@@ -45,6 +45,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth") // Cho xác thực
     implementation("com.google.firebase:firebase-firestore") // Cho lưu trữ dữ liệu
     implementation("com.google.firebase:firebase-messaging") // Cho thông báo đẩy
+    implementation("com.cloudinary:cloudinary-android:3.1.2") // Cho lưu trữ media (thay Firebase Storage)
     implementation("com.github.bumptech.glide:glide:4.16.0") // Cho tải ảnh
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0") // Cho Glide annotation processing
 }
