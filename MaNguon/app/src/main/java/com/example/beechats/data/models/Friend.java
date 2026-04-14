@@ -1,12 +1,12 @@
 package com.example.beechats.data.models;
 
-import java.util.Date;
+import com.google.firebase.Timestamp;
 
 public class Friend {
     private String friendUserId;
     private String displayName;
     private String photoUrl;
-    private Date addedAt;
+    private Timestamp addedAt;
 
     public Friend() {}
 
@@ -34,11 +34,11 @@ public class Friend {
         this.photoUrl = photoUrl;
     }
 
-    public Date getAddedAt() {
+    public Timestamp getAddedAt() {
         return addedAt;
     }
 
-    public void setAddedAt(Date addedAt) {
+    public void setAddedAt(Timestamp addedAt) {
         this.addedAt = addedAt;
     }
 }

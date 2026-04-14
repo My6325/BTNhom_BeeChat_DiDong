@@ -1,6 +1,6 @@
 package com.example.beechats.data.models;
 
-import java.util.Date;
+import com.google.firebase.Timestamp;
 import java.util.List;
 import java.util.Map;
 
@@ -19,9 +19,9 @@ public class Message {
 
     // Trạng thái
     private String status;
-    private Map<String, Date> readBy;
+    private Map<String, Timestamp> readBy;
     private boolean isRecalled;
-    private Date recalledAt;
+    private Timestamp recalledAt;
     private List<String> deletedFor;
 
     // Trả lời & phản ứng
@@ -31,10 +31,10 @@ public class Message {
     // Ghim
     private boolean isPinned;
     private String pinnedBy;
-    private Date pinnedAt;
+    private Timestamp pinnedAt;
 
-    private Date createdAt;
-    private Date updatedAt;
+    private Timestamp createdAt;
+    private Timestamp updatedAt;
 
     public Message() {}
 
@@ -134,11 +134,11 @@ public class Message {
         isRecalled = recalled;
     }
 
-    public Date getRecalledAt() {
+    public Timestamp getRecalledAt() {
         return recalledAt;
     }
 
-    public void setRecalledAt(Date recalledAt) {
+    public void setRecalledAt(Timestamp recalledAt) {
         this.recalledAt = recalledAt;
     }
 
@@ -182,27 +182,27 @@ public class Message {
         this.pinnedBy = pinnedBy;
     }
 
-    public Date getPinnedAt() {
+    public Timestamp getPinnedAt() {
         return pinnedAt;
     }
 
-    public void setPinnedAt(Date pinnedAt) {
+    public void setPinnedAt(Timestamp pinnedAt) {
         this.pinnedAt = pinnedAt;
     }
 
-    public Date getCreatedAt() {
+    public Timestamp getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Date createdAt) {
+    public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Date getUpdatedAt() {
+    public Timestamp getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Date updatedAt) {
+    public void setUpdatedAt(Timestamp updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

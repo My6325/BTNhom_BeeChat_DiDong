@@ -1,14 +1,14 @@
 package com.example.beechats.data.models;
 
-import java.util.Date;
+import com.google.firebase.Timestamp;
 
 public class ConversationMember {
     private String memberId;
     private String nickname;
     private String role;
-    private Date joinedAt;
+    private Timestamp joinedAt;
     private String lastReadMessageId;
-    private Date lastReadTimestamp;
+    private Timestamp lastReadTimestamp;
     private boolean isMuted;
 
     public ConversationMember() {}
@@ -37,11 +37,11 @@ public class ConversationMember {
         this.role = role;
     }
 
-    public Date getJoinedAt() {
+    public Timestamp getJoinedAt() {
         return joinedAt;
     }
 
-    public void setJoinedAt(Date joinedAt) {
+    public void setJoinedAt(Timestamp joinedAt) {
         this.joinedAt = joinedAt;
     }
 
@@ -53,11 +53,11 @@ public class ConversationMember {
         this.lastReadMessageId = lastReadMessageId;
     }
 
-    public Date getLastReadTimestamp() {
+    public Timestamp getLastReadTimestamp() {
         return lastReadTimestamp;
     }
 
-    public void setLastReadTimestamp(Date lastReadTimestamp) {
+    public void setLastReadTimestamp(Timestamp lastReadTimestamp) {
         this.lastReadTimestamp = lastReadTimestamp;
     }
 
