@@ -1,6 +1,6 @@
 package com.example.beechats.data.models;
 
-import java.util.Date;
+import com.google.firebase.Timestamp;
 import java.util.List;
 
 public class User {
@@ -11,11 +11,11 @@ public class User {
     private String bio;
     private List<String> searchKeywords;
     private boolean isOnline;
-    private Date lastSeen;
+    private Timestamp lastSeen;
     private UserSettings settings;
     private String fcmToken;
-    private Date createdAt;
-    private Date updatedAt;
+    private Timestamp createdAt;
+    private Timestamp updatedAt;
 
     public User() {}
 
@@ -75,11 +75,11 @@ public class User {
         isOnline = online;
     }
 
-    public Date getLastSeen() {
+    public Timestamp getLastSeen() {
         return lastSeen;
     }
 
-    public void setLastSeen(Date lastSeen) {
+    public void setLastSeen(Timestamp lastSeen) {
         this.lastSeen = lastSeen;
     }
 
@@ -99,19 +99,19 @@ public class User {
         this.fcmToken = fcmToken;
     }
 
-    public Date getCreatedAt() {
+    public Timestamp getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Date createdAt) {
+    public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Date getUpdatedAt() {
+    public Timestamp getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Date updatedAt) {
+    public void setUpdatedAt(Timestamp updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

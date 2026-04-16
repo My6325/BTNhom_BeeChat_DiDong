@@ -1,13 +1,13 @@
 package com.example.beechats.data.models;
 
-import java.util.Date;
+import com.google.firebase.Timestamp;
 
 public class LastMessageInfo {
     private String text;
     private String senderId;
     private String senderName;
     private String type;
-    private Date timestamp;
+    private Timestamp timestamp;
 
     public LastMessageInfo() {}
 
@@ -43,11 +43,11 @@ public class LastMessageInfo {
         this.type = type;
     }
 
-    public Date getTimestamp() {
+    public Timestamp getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(Date timestamp) {
+    public void setTimestamp(Timestamp timestamp) {
         this.timestamp = timestamp;
     }
 }

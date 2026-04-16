@@ -1,10 +1,10 @@
 package com.example.beechats.data.models;
 
-import java.util.Date;
+import com.google.firebase.Timestamp;
 
 public class BlockedUser {
     private String blockedUserId;
-    private Date blockedAt;
+    private Timestamp blockedAt;
 
     public BlockedUser() {}
 
@@ -16,11 +16,11 @@ public class BlockedUser {
         this.blockedUserId = blockedUserId;
     }
 
-    public Date getBlockedAt() {
+    public Timestamp getBlockedAt() {
         return blockedAt;
     }
 
-    public void setBlockedAt(Date blockedAt) {
+    public void setBlockedAt(Timestamp blockedAt) {
         this.blockedAt = blockedAt;
     }
 }
