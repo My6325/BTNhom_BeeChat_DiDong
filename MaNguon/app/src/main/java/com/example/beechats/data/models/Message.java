@@ -19,7 +19,7 @@ public class Message {
 
     // Trạng thái
     private String status;
-    private Map<String, Timestamp> readBy;
+    private Map<String, Object> readBy;
     private boolean isRecalled;
     private Timestamp recalledAt;
     private List<String> deletedFor;
@@ -118,11 +118,11 @@ public class Message {
         this.status = status;
     }
 
-    public Map<String, Date> getReadBy() {
+    public Map<String, Object> getReadBy() {
         return readBy;
     }
 
-    public void setReadBy(Map<String, Date> readBy) {
+    public void setReadBy(Map<String, Object> readBy) {
         this.readBy = readBy;
     }
 
