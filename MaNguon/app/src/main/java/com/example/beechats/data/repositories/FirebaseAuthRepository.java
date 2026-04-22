@@ -3,6 +3,7 @@ package com.example.beechats.data.repositories;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.models.UserSettings;
 import com.example.beechats.utils.ErrorHandler;
+import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -150,15 +151,43 @@ public class FirebaseAuthRepository {
         auth.signOut();
     }
 
-    public void changePassword(String newPassword, OnAuthCallback callback) {
+    /**
+     * Đổi mật khẩu: re-authenticate bằng mật khẩu hiện tại trước, sau đó mới cập nhật mật khẩu mới.
+     * Firebase yêu cầu re-authentication để bảo mật cho thao tác nhạy cảm này.
+     *
+     * @param currentPassword Mật khẩu hiện tại (dùng để re-authenticate)
+     * @param newPassword     Mật khẩu mới (phải ≥ 6 ký tự)
+     * @param callback        Kết quả trả về
+     */
+    public void changePassword(String currentPassword, String newPassword, OnAuthCallback callback) {
+        if (newPassword == null || newPassword.isEmpty()) {
+            callback.onError("Mật khẩu không được để trống.");
+            return;
+        }
+        if (newPassword.length() < 6) {
+            callback.onError("Mật khẩu phải có ít nhất 6 ký tự.");
+            return;
+        }
+
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
             callback.onError("Chưa đăng nhập");
             return;
         }
-        user.updatePassword(newPassword)
-                .addOnSuccessListener(unused -> callback.onSuccess())
+
+        String email = user.getEmail();
+        user.reauthenticate(getEmailCredential(email, currentPassword))
+                .addOnSuccessListener(unused ->
+                        user.updatePassword(newPassword)
+                                .addOnSuccessListener(v -> callback.onSuccess())
+                                .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)))
+                )
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
+    }
+
+    /** Protected để cho phép override trong unit test (tránh Android TextUtils không mock được). */
+    protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+        return EmailAuthProvider.getCredential(email, password);
     }
 
     public void deleteAccount(OnAuthCallback callback) {

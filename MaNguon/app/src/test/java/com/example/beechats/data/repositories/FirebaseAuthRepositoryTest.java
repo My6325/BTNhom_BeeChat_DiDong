@@ -13,6 +13,7 @@ import com.example.beechats.data.models.User;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
@@ -235,6 +236,103 @@ public class FirebaseAuthRepositoryTest {
     }
 
     // -----------------------------------------------------------------------
+    // TC11: changePassword — Happy Path: re-auth thành công + updatePassword thành công
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void changePassword_validCredentials_callsOnSuccess() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockUser.getEmail()).thenReturn("user@example.com");
+        when(mockAuth.getCurrentUser()).thenReturn(mockUser);
+
+        // Mock reauthenticate thành công
+        AuthCredential mockCredential = mock(AuthCredential.class);
+        Task<Void> mockReauthTask = buildVoidSuccessTask();
+        when(mockUser.reauthenticate(mockCredential)).thenReturn(mockReauthTask);
+
+        // Mock updatePassword thành công
+        Task<Void> mockUpdateTask = buildVoidSuccessTask();
+        when(mockUser.updatePassword("NewPass@123")).thenReturn(mockUpdateTask);
+
+        // Dùng anonymous subclass để bypass EmailAuthProvider.getCredential() (Android API)
+        FirebaseAuthRepository testRepo = new FirebaseAuthRepository(mockAuth, mockUserRepository) {
+            @Override
+            protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+                return mockCredential;
+            }
+        };
+
+        testRepo.changePassword("OldPass@123", "NewPass@123", mockCallback);
+
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC12: changePassword — newPassword < 6 ký tự → onError ngay, Firebase không gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void changePassword_shortNewPassword_callsOnErrorWithoutCallingFirebase() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockAuth.getCurrentUser()).thenReturn(mockUser);
+
+        repository.changePassword("OldPass@123", "12345", mockCallback);
+
+        verify(mockCallback).onError("Mật khẩu phải có ít nhất 6 ký tự.");
+        verify(mockCallback, never()).onSuccess();
+        // Firebase reauthenticate không được gọi
+        verify(mockUser, never()).reauthenticate(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC13: changePassword — currentPassword sai → reauthenticate fail → onError tiếng Việt
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void changePassword_wrongCurrentPassword_callsOnErrorWithVietnameseMessage() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockUser.getEmail()).thenReturn("user@example.com");
+        when(mockAuth.getCurrentUser()).thenReturn(mockUser);
+
+        AuthCredential mockCredential = mock(AuthCredential.class);
+        FirebaseAuthInvalidCredentialsException exception =
+                mock(FirebaseAuthInvalidCredentialsException.class);
+
+        Task<Void> mockReauthTask = buildVoidFailureTask(exception);
+        when(mockUser.reauthenticate(mockCredential)).thenReturn(mockReauthTask);
+
+        // Dùng anonymous subclass để bypass EmailAuthProvider.getCredential() (Android API)
+        FirebaseAuthRepository testRepo = new FirebaseAuthRepository(mockAuth, mockUserRepository) {
+            @Override
+            protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+                return mockCredential;
+            }
+        };
+
+        testRepo.changePassword("WrongPass", "NewPass@123", mockCallback);
+
+        verify(mockCallback).onError("Thông tin đăng nhập không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        // updatePassword không được gọi khi re-auth fail
+        verify(mockUser, never()).updatePassword(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC14: changePassword — User chưa đăng nhập → onError("Chưa đăng nhập")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void changePassword_userNotLoggedIn_callsOnErrorNotLoggedIn() {
+        when(mockAuth.getCurrentUser()).thenReturn(null);
+
+        repository.changePassword("OldPass@123", "NewPass@123", mockCallback);
+
+        verify(mockCallback).onError("Chưa đăng nhập");
+        verify(mockCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
     // Helper: tạo mock Task thành công
     // -----------------------------------------------------------------------
 
@@ -256,6 +354,36 @@ public class FirebaseAuthRepositoryTest {
     @SuppressWarnings("unchecked")
     private <T> Task<T> buildFailureTask(Exception exception) {
         Task<T> mockTask = mock(Task.class);
+        when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
+        doAnswer(inv -> {
+            ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
+            return mockTask;
+        }).when(mockTask).addOnFailureListener(any(OnFailureListener.class));
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<Void> thành công
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<Void> buildVoidSuccessTask() {
+        Task<Void> mockTask = mock(Task.class);
+        doAnswer(inv -> {
+            ((OnSuccessListener<Void>) inv.getArgument(0)).onSuccess(null);
+            return mockTask;
+        }).when(mockTask).addOnSuccessListener(any(OnSuccessListener.class));
+        when(mockTask.addOnFailureListener(any(OnFailureListener.class))).thenReturn(mockTask);
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<Void> thất bại
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<Void> buildVoidFailureTask(Exception exception) {
+        Task<Void> mockTask = mock(Task.class);
         when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
         doAnswer(inv -> {
             ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
