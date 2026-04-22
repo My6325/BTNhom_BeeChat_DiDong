@@ -15,6 +15,10 @@
     <string name="password">password</string>
     <string name="gmail">example@gmail.com</string>
     <string name="login">Đăng nhập</string>
+    <string name="tim_kiem">Tìm kiếm</string>
+    <string name="tat_ca">Tất cả</string>
+    <string name="chua_doc">Chưa đọc</string>
+    <string name="nhom">Nhóm</string>
     <string name="sign_up">Tạo tài khoản mới</string>
     <string name="toi_dong_y">Tôi đồng ý với các điều khoản người dùng</string>
     <string name="dien_email...">Điền email hoặc số điện thoại gắn với tài khoản của bạn để nhận đường dẫn thay đổi mật khẩu</string>

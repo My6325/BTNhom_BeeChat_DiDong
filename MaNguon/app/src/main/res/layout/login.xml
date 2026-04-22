@@ -5,7 +5,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:background="@color/yellow"
-    tools:context=".Login_Activity"
+    tools:context=".ui.auth.LoginActivity"
     android:orientation="vertical"
     android:padding="30dp"
     android:gravity="center_horizontal">
@@ -74,7 +74,7 @@
     <Button
         android:id="@+id/btnRegister"
         android:layout_width="250dp"
-        android:layout_height="45dp"
+        android:layout_height="wrap_content"
         android:text="@string/sign_up"
         android:textSize="20sp"
         android:textColor="@color/black"

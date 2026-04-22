@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:context=".Register_Activity"
+    tools:context=".ui.onboarding.Register_Activity"
     android:background="@color/yellow">
 
     <ImageView

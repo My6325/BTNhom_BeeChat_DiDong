@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:context=".Introduce_QR"
+    tools:context=".ui.onboarding.IntroduceQrActivity"
     android:background="@color/yellow"
     android:gravity="center"
     android:orientation="vertical">
