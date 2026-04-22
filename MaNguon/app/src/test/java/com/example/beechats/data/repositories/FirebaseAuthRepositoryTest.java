@@ -15,6 +15,7 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException;
 import com.google.firebase.auth.FirebaseUser;
@@ -151,6 +152,86 @@ public class FirebaseAuthRepositoryTest {
 
         verify(mockCallback).onError("Tên hiển thị không được để trống.");
         verify(mockAuth, never()).createUserWithEmailAndPassword(anyString(), anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC7: Login — Happy Path: Auth thành công → updateOnlineStatus(uid, true) → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void login_validCredentials_updatesOnlineStatusAndCallsOnSuccess() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockUser.getUid()).thenReturn("login-uid-007");
+
+        AuthResult mockAuthResult = mock(AuthResult.class);
+        when(mockAuthResult.getUser()).thenReturn(mockUser);
+
+        Task<AuthResult> mockTask = buildSuccessTask(mockAuthResult);
+        when(mockAuth.signInWithEmailAndPassword(eq("user@example.com"), eq("pass1234")))
+                .thenReturn(mockTask);
+
+        // Mock updateOnlineStatus trả về thành công
+        doAnswer(inv -> {
+            UserRepository.OnCompleteCallback cb = inv.getArgument(2);
+            cb.onSuccess();
+            return null;
+        }).when(mockUserRepository).updateOnlineStatus(
+                eq("login-uid-007"), eq(true), any(UserRepository.OnCompleteCallback.class));
+
+        repository.login("user@example.com", "pass1234", mockCallback);
+
+        // Phải gọi updateOnlineStatus với uid đúng và isOnline=true
+        verify(mockUserRepository).updateOnlineStatus(
+                eq("login-uid-007"), eq(true), any(UserRepository.OnCompleteCallback.class));
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC8: Login — Sai thông tin đăng nhập → onError với message tiếng Việt
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void login_invalidCredentials_callsOnErrorWithVietnameseMessage() {
+        FirebaseAuthInvalidCredentialsException exception =
+                mock(FirebaseAuthInvalidCredentialsException.class);
+
+        Task<AuthResult> mockTask = buildFailureTask(exception);
+        when(mockAuth.signInWithEmailAndPassword(anyString(), anyString()))
+                .thenReturn(mockTask);
+
+        repository.login("user@example.com", "wrongpass", mockCallback);
+
+        verify(mockCallback).onError("Thông tin đăng nhập không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        // Firestore không được gọi khi Auth thất bại
+        verify(mockUserRepository, never()).updateOnlineStatus(anyString(), eq(true), any());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC9: Login — Email null → onError() ngay, Firebase không được gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void login_nullEmail_callsOnErrorWithoutCallingFirebase() {
+        repository.login(null, "pass1234", mockCallback);
+
+        verify(mockCallback).onError("Email không được để trống.");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockAuth, never()).signInWithEmailAndPassword(anyString(), anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC10: Login — Password rỗng → onError() ngay, Firebase không được gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void login_emptyPassword_callsOnErrorWithoutCallingFirebase() {
+        repository.login("user@example.com", "", mockCallback);
+
+        verify(mockCallback).onError("Mật khẩu không được để trống.");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockAuth, never()).signInWithEmailAndPassword(anyString(), anyString());
     }
 
     // -----------------------------------------------------------------------

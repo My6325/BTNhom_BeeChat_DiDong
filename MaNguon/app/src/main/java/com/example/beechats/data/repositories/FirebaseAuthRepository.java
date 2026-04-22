@@ -96,13 +96,57 @@ public class FirebaseAuthRepository {
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 
+    /**
+     * Đăng nhập bằng email/password, cập nhật isOnline=true và lastSeen sau khi xác thực thành công.
+     * Nếu Firestore update thất bại, vẫn gọi onSuccess() để không block đăng nhập.
+     *
+     * @param email    Email đăng nhập
+     * @param password Mật khẩu
+     * @param callback Kết quả trả về
+     */
     public void login(String email, String password, OnAuthCallback callback) {
-        auth.signInWithEmailAndPassword(email, password)
-                .addOnSuccessListener(result -> callback.onSuccess())
+        if (email == null || email.trim().isEmpty()) {
+            callback.onError("Email không được để trống.");
+            return;
+        }
+        if (password == null || password.isEmpty()) {
+            callback.onError("Mật khẩu không được để trống.");
+            return;
+        }
+
+        auth.signInWithEmailAndPassword(email.trim(), password)
+                .addOnSuccessListener(result -> {
+                    String uid = result.getUser().getUid();
+                    // Cập nhật trạng thái online — không block đăng nhập nếu Firestore fail
+                    userRepository.updateOnlineStatus(uid, true, new UserRepository.OnCompleteCallback() {
+                        @Override
+                        public void onSuccess() {
+                            callback.onSuccess();
+                        }
+
+                        @Override
+                        public void onError(String errorMessage) {
+                            // Auth thành công — vẫn cho đăng nhập dù Firestore update thất bại
+                            callback.onSuccess();
+                        }
+                    });
+                })
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 
+    /**
+     * Đăng xuất: set isOnline=false (fire-and-forget) rồi signOut ngay.
+     * Không có callback — signOut luôn thành công ở local.
+     */
     public void logout() {
+        String uid = getCurrentUserId();
+        if (uid != null) {
+            // Fire-and-forget: không đợi Firestore để đảm bảo UX
+            userRepository.updateOnlineStatus(uid, false, new UserRepository.OnCompleteCallback() {
+                @Override public void onSuccess() {}
+                @Override public void onError(String errorMessage) {}
+            });
+        }
         auth.signOut();
     }
 

@@ -2,7 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
+        android:name=".BeeChatsApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -11,21 +14,29 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.BeeChats">
+
+        <!-- Onboarding flow -->
         <activity
-            android:name=".Welcome_Activity"
+            android:name=".ui.onboarding.WelcomeActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".Introduce_Activity" android:exported="false" />
-        <activity android:name=".Introduce_QR" android:exported="false" />
-        <activity android:name=".Introduce_Setting" android:exported="false" />
-        <activity android:name=".Introduce_Mail" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceQrActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceSettingActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceMailActivity" android:exported="false" />
+
+        <!-- Auth flow -->
+        <activity android:name=".ui.auth.LoginActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.Register_Activity" android:exported="false" android:windowSoftInputMode="adjustPan" />
+        <activity android:name=".ui.onboarding.ForgetPassword" android:exported="false" android:windowSoftInputMode="adjustPan" />
+
+        <!-- Legacy activities (root package) -->
         <activity android:name=".Login_Activity" android:exported="false" />
-        <activity android:name=".Register_Activity" android:exported="false" android:windowSoftInputMode="adjustPan"/>
+        <activity android:name=".Register_Activity" android:exported="false" android:windowSoftInputMode="adjustPan" />
         <activity android:name=".ForgetPassword" android:exported="false" android:windowSoftInputMode="adjustPan" />
 
     </application>
