@@ -32,68 +32,6 @@ public class WelcomeActivity extends AppCompatActivity {
                 finish();
             }
         });
-
-        // TEST TASK 1.9 — xóa sau khi verify trên Firebase Console
-        testUpdateProfile();
     }
 
-    /**
-     * Test flow cập nhật profile:
-     * 1. Đăng ký user test (nếu chưa có)
-     * 2. Login → lấy uid → gọi updateProfile(uid, displayName, bio, callback)
-     * Verify trên Firebase Console > Firestore > users/{uid}:
-     *   - displayName: "BeeChat User 1.9"
-     *   - bio: "Bio test 1.9"
-     *   - searchKeywords: chứa prefix của "beechat"
-     */
-    private void testUpdateProfile() {
-        FirebaseAuthRepository authRepo = new FirebaseAuthRepository();
-        UserRepository userRepo = new UserRepository();
-        String testEmail    = "test.profile.1_9@beechat.com";
-        String testPassword = "ProfilePass@1234";
-        String testName     = "BeeChat Test 1.9";
-
-        // Thử login trước — nếu user đã tồn tại thì update profile luôn
-        authRepo.login(testEmail, testPassword, new FirebaseAuthRepository.OnAuthCallback() {
-            @Override
-            public void onSuccess() {
-                String uid = authRepo.getCurrentUserId();
-                Log.d("BeeChat_Test", "Login OK (uid=" + uid + ") → tiến hành update profile...");
-                doUpdateProfile(userRepo, uid);
-            }
-
-            @Override
-            public void onError(String msg) {
-                Log.w("BeeChat_Test", "Login thất bại: " + msg + " → đăng ký user mới...");
-                authRepo.register(testEmail, testPassword, testName,
-                        new FirebaseAuthRepository.OnAuthCallback() {
-                            @Override
-                            public void onSuccess() {
-                                String uid = authRepo.getCurrentUserId();
-                                Log.d("BeeChat_Test", "✅ Đăng ký OK (uid=" + uid + ") → update profile...");
-                                doUpdateProfile(userRepo, uid);
-                            }
-                            @Override
-                            public void onError(String e) {
-                                Log.e("BeeChat_Test", "❌ Đăng ký thất bại: " + e);
-                            }
-                        });
-            }
-        });
-    }
-
-    /** Cập nhật profile và log kết quả. */
-    private void doUpdateProfile(UserRepository userRepo, String uid) {
-        userRepo.updateProfile(uid, "BeeChat User 1.9", "Bio test 1.9",
-                new UserRepository.OnCompleteCallback() {
-                    @Override
-                    public void onSuccess() {
-                        Log.d("BeeChat_Test", "✅ Cập nhật profile thành công → kiểm tra Firebase Console: Firestore > users/" + uid);
-                    }
-                    @Override
-                    public void onError(String e) {
-                        Log.e("BeeChat_Test", "❌ Cập nhật profile thất bại: " + e);
-                    }
-                });
-    }
 }
