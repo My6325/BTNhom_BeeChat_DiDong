@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.beechats.R;
 import com.example.beechats.data.repositories.FirebaseAuthRepository;
+import com.example.beechats.data.repositories.UserRepository;
 
 public class WelcomeActivity extends AppCompatActivity {
 
@@ -32,53 +33,45 @@ public class WelcomeActivity extends AppCompatActivity {
             }
         });
 
-        // TEST TASK 1.8 — xóa sau khi verify trên Firebase Console
-        testDeleteAccount();
+        // TEST TASK 1.9 — xóa sau khi verify trên Firebase Console
+        testUpdateProfile();
     }
 
     /**
-     * Test flow xóa tài khoản:
+     * Test flow cập nhật profile:
      * 1. Đăng ký user test (nếu chưa có)
-     * 2. Login → xóa tài khoản bằng deleteAccount(password, callback)
-     * Verify trên Firebase Console:
-     *   - Authentication: test.delete.1_8@beechat.com KHÔNG còn tồn tại
-     *   - Firestore > users: document {uid} KHÔNG còn tồn tại
+     * 2. Login → lấy uid → gọi updateProfile(uid, displayName, bio, callback)
+     * Verify trên Firebase Console > Firestore > users/{uid}:
+     *   - displayName: "BeeChat User 1.9"
+     *   - bio: "Bio test 1.9"
+     *   - searchKeywords: chứa prefix của "beechat"
      */
-    private void testDeleteAccount() {
+    private void testUpdateProfile() {
         FirebaseAuthRepository authRepo = new FirebaseAuthRepository();
-        String testEmail    = "test.delete.1_8@beechat.com";
-        String testPassword = "DeletePass@1234";
-        String testName     = "BeeChat Test 1.8";
+        UserRepository userRepo = new UserRepository();
+        String testEmail    = "test.profile.1_9@beechat.com";
+        String testPassword = "ProfilePass@1234";
+        String testName     = "BeeChat Test 1.9";
 
-        // Thử login trước — nếu user đã tồn tại từ lần chạy trước thì xóa luôn
+        // Thử login trước — nếu user đã tồn tại thì update profile luôn
         authRepo.login(testEmail, testPassword, new FirebaseAuthRepository.OnAuthCallback() {
             @Override
             public void onSuccess() {
-                Log.d("BeeChat_Test", "Login OK → tiến hành xóa tài khoản...");
-                doDeleteAccount(authRepo, testPassword);
+                String uid = authRepo.getCurrentUserId();
+                Log.d("BeeChat_Test", "Login OK (uid=" + uid + ") → tiến hành update profile...");
+                doUpdateProfile(userRepo, uid);
             }
 
             @Override
             public void onError(String msg) {
                 Log.w("BeeChat_Test", "Login thất bại: " + msg + " → đăng ký user mới...");
-                // User chưa tồn tại → đăng ký rồi xóa
                 authRepo.register(testEmail, testPassword, testName,
                         new FirebaseAuthRepository.OnAuthCallback() {
                             @Override
                             public void onSuccess() {
-                                Log.d("BeeChat_Test", "✅ Đăng ký OK → logout → login → xóa tài khoản...");
-                                authRepo.logout();
-                                authRepo.login(testEmail, testPassword,
-                                        new FirebaseAuthRepository.OnAuthCallback() {
-                                            @Override
-                                            public void onSuccess() {
-                                                doDeleteAccount(authRepo, testPassword);
-                                            }
-                                            @Override
-                                            public void onError(String e) {
-                                                Log.e("BeeChat_Test", "❌ Login sau đăng ký thất bại: " + e);
-                                            }
-                                        });
+                                String uid = authRepo.getCurrentUserId();
+                                Log.d("BeeChat_Test", "✅ Đăng ký OK (uid=" + uid + ") → update profile...");
+                                doUpdateProfile(userRepo, uid);
                             }
                             @Override
                             public void onError(String e) {
@@ -89,17 +82,18 @@ public class WelcomeActivity extends AppCompatActivity {
         });
     }
 
-    /** Xóa tài khoản và log kết quả. */
-    private void doDeleteAccount(FirebaseAuthRepository authRepo, String password) {
-        authRepo.deleteAccount(password, new FirebaseAuthRepository.OnAuthCallback() {
-            @Override
-            public void onSuccess() {
-                Log.d("BeeChat_Test", "✅ Xóa tài khoản thành công → kiểm tra Firebase Console: user không còn trong Auth và Firestore");
-            }
-            @Override
-            public void onError(String e) {
-                Log.e("BeeChat_Test", "❌ Xóa tài khoản thất bại: " + e);
-            }
-        });
+    /** Cập nhật profile và log kết quả. */
+    private void doUpdateProfile(UserRepository userRepo, String uid) {
+        userRepo.updateProfile(uid, "BeeChat User 1.9", "Bio test 1.9",
+                new UserRepository.OnCompleteCallback() {
+                    @Override
+                    public void onSuccess() {
+                        Log.d("BeeChat_Test", "✅ Cập nhật profile thành công → kiểm tra Firebase Console: Firestore > users/" + uid);
+                    }
+                    @Override
+                    public void onError(String e) {
+                        Log.e("BeeChat_Test", "❌ Cập nhật profile thất bại: " + e);
+                    }
+                });
     }
 }
