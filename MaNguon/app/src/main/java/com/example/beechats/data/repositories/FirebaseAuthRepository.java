@@ -190,14 +190,41 @@ public class FirebaseAuthRepository {
         return EmailAuthProvider.getCredential(email, password);
     }
 
-    public void deleteAccount(OnAuthCallback callback) {
+    /**
+     * Xóa tài khoản: re-authenticate → xóa Firestore document → xóa Auth user.
+     * Thứ tự bắt buộc: Firestore TRƯỚC Auth (sau khi xóa Auth, credentials bị hủy).
+     *
+     * @param currentPassword Mật khẩu hiện tại (dùng để re-authenticate)
+     * @param callback        Kết quả trả về
+     */
+    public void deleteAccount(String currentPassword, OnAuthCallback callback) {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
             callback.onError("Chưa đăng nhập");
             return;
         }
-        user.delete()
-                .addOnSuccessListener(unused -> callback.onSuccess())
+
+        String uid = user.getUid();
+        String email = user.getEmail();
+
+        user.reauthenticate(getEmailCredential(email, currentPassword))
+                .addOnSuccessListener(unused ->
+                        // Xóa Firestore document trước
+                        userRepository.deleteUser(uid, new UserRepository.OnCompleteCallback() {
+                            @Override
+                            public void onSuccess() {
+                                // Sau đó mới xóa Auth user
+                                user.delete()
+                                        .addOnSuccessListener(v -> callback.onSuccess())
+                                        .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
+                            }
+
+                            @Override
+                            public void onError(String errorMessage) {
+                                callback.onError(errorMessage);
+                            }
+                        })
+                )
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 }

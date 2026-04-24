@@ -333,6 +333,132 @@ public class FirebaseAuthRepositoryTest {
     }
 
     // -----------------------------------------------------------------------
+    // TC15: deleteAccount — Happy Path: re-auth OK → Firestore xóa OK → Auth xóa OK
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void deleteAccount_validCredentials_deletesFirestoreThenAuthAndCallsOnSuccess() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockUser.getEmail()).thenReturn("user@example.com");
+        when(mockUser.getUid()).thenReturn("delete-uid-001");
+        when(mockAuth.getCurrentUser()).thenReturn(mockUser);
+
+        AuthCredential mockCredential = mock(AuthCredential.class);
+        Task<Void> reauthTask = buildVoidSuccessTask();
+        Task<Void> deleteTask = buildVoidSuccessTask();
+        when(mockUser.reauthenticate(mockCredential)).thenReturn(reauthTask);
+        when(mockUser.delete()).thenReturn(deleteTask);
+
+        doAnswer(inv -> {
+            UserRepository.OnCompleteCallback cb = inv.getArgument(1);
+            cb.onSuccess();
+            return null;
+        }).when(mockUserRepository).deleteUser(
+                eq("delete-uid-001"), any(UserRepository.OnCompleteCallback.class));
+
+        FirebaseAuthRepository testRepo = new FirebaseAuthRepository(mockAuth, mockUserRepository) {
+            @Override
+            protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+                return mockCredential;
+            }
+        };
+
+        testRepo.deleteAccount("CurrentPass@123", mockCallback);
+
+        // Phải xóa Firestore và Auth, sau đó gọi onSuccess
+        verify(mockUserRepository).deleteUser(eq("delete-uid-001"), any());
+        verify(mockUser).delete();
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC16: deleteAccount — Re-auth fail → Firestore và Auth KHÔNG bị xóa
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void deleteAccount_wrongPassword_callsOnErrorAndDoesNotDelete() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockUser.getEmail()).thenReturn("user@example.com");
+        when(mockUser.getUid()).thenReturn("delete-uid-001");
+        when(mockAuth.getCurrentUser()).thenReturn(mockUser);
+
+        AuthCredential mockCredential = mock(AuthCredential.class);
+        FirebaseAuthInvalidCredentialsException exception =
+                mock(FirebaseAuthInvalidCredentialsException.class);
+        Task<Void> reauthTask = buildVoidFailureTask(exception);
+        when(mockUser.reauthenticate(mockCredential)).thenReturn(reauthTask);
+
+        FirebaseAuthRepository testRepo = new FirebaseAuthRepository(mockAuth, mockUserRepository) {
+            @Override
+            protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+                return mockCredential;
+            }
+        };
+
+        testRepo.deleteAccount("WrongPass", mockCallback);
+
+        verify(mockCallback).onError("Thông tin đăng nhập không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        // Firestore và Auth user KHÔNG được xóa
+        verify(mockUserRepository, never()).deleteUser(anyString(), any());
+        verify(mockUser, never()).delete();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC17: deleteAccount — User chưa đăng nhập → onError("Chưa đăng nhập")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void deleteAccount_userNotLoggedIn_callsOnErrorNotLoggedIn() {
+        when(mockAuth.getCurrentUser()).thenReturn(null);
+
+        repository.deleteAccount("AnyPass@123", mockCallback);
+
+        verify(mockCallback).onError("Chưa đăng nhập");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockUserRepository, never()).deleteUser(anyString(), any());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC18: deleteAccount — Firestore delete fail → Auth user KHÔNG bị xóa
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void deleteAccount_firestoreDeleteFails_doesNotDeleteAuthUser() {
+        FirebaseUser mockUser = mock(FirebaseUser.class);
+        when(mockUser.getEmail()).thenReturn("user@example.com");
+        when(mockUser.getUid()).thenReturn("delete-uid-001");
+        when(mockAuth.getCurrentUser()).thenReturn(mockUser);
+
+        AuthCredential mockCredential = mock(AuthCredential.class);
+        Task<Void> reauthTask = buildVoidSuccessTask();
+        when(mockUser.reauthenticate(mockCredential)).thenReturn(reauthTask);
+
+        // Firestore xóa thất bại
+        doAnswer(inv -> {
+            UserRepository.OnCompleteCallback cb = inv.getArgument(1);
+            cb.onError("Lỗi kết nối Firestore");
+            return null;
+        }).when(mockUserRepository).deleteUser(
+                eq("delete-uid-001"), any(UserRepository.OnCompleteCallback.class));
+
+        FirebaseAuthRepository testRepo = new FirebaseAuthRepository(mockAuth, mockUserRepository) {
+            @Override
+            protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+                return mockCredential;
+            }
+        };
+
+        testRepo.deleteAccount("CurrentPass@123", mockCallback);
+
+        verify(mockCallback).onError("Lỗi kết nối Firestore");
+        verify(mockCallback, never()).onSuccess();
+        // Auth user KHÔNG được xóa vì Firestore chưa xóa xong
+        verify(mockUser, never()).delete();
+    }
+
+    // -----------------------------------------------------------------------
     // Helper: tạo mock Task thành công
     // -----------------------------------------------------------------------
 
