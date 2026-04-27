@@ -3,6 +3,7 @@ package com.example.beechats.data.repositories;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.models.UserSettings;
 import com.example.beechats.utils.ErrorHandler;
+import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -96,35 +97,134 @@ public class FirebaseAuthRepository {
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 
+    /**
+     * Đăng nhập bằng email/password, cập nhật isOnline=true và lastSeen sau khi xác thực thành công.
+     * Nếu Firestore update thất bại, vẫn gọi onSuccess() để không block đăng nhập.
+     *
+     * @param email    Email đăng nhập
+     * @param password Mật khẩu
+     * @param callback Kết quả trả về
+     */
     public void login(String email, String password, OnAuthCallback callback) {
-        auth.signInWithEmailAndPassword(email, password)
-                .addOnSuccessListener(result -> callback.onSuccess())
+        if (email == null || email.trim().isEmpty()) {
+            callback.onError("Email không được để trống.");
+            return;
+        }
+        if (password == null || password.isEmpty()) {
+            callback.onError("Mật khẩu không được để trống.");
+            return;
+        }
+
+        auth.signInWithEmailAndPassword(email.trim(), password)
+                .addOnSuccessListener(result -> {
+                    String uid = result.getUser().getUid();
+                    // Cập nhật trạng thái online — không block đăng nhập nếu Firestore fail
+                    userRepository.updateOnlineStatus(uid, true, new UserRepository.OnCompleteCallback() {
+                        @Override
+                        public void onSuccess() {
+                            callback.onSuccess();
+                        }
+
+                        @Override
+                        public void onError(String errorMessage) {
+                            // Auth thành công — vẫn cho đăng nhập dù Firestore update thất bại
+                            callback.onSuccess();
+                        }
+                    });
+                })
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 
+    /**
+     * Đăng xuất: set isOnline=false (fire-and-forget) rồi signOut ngay.
+     * Không có callback — signOut luôn thành công ở local.
+     */
     public void logout() {
+        String uid = getCurrentUserId();
+        if (uid != null) {
+            // Fire-and-forget: không đợi Firestore để đảm bảo UX
+            userRepository.updateOnlineStatus(uid, false, new UserRepository.OnCompleteCallback() {
+                @Override public void onSuccess() {}
+                @Override public void onError(String errorMessage) {}
+            });
+        }
         auth.signOut();
     }
 
-    public void changePassword(String newPassword, OnAuthCallback callback) {
+    /**
+     * Đổi mật khẩu: re-authenticate bằng mật khẩu hiện tại trước, sau đó mới cập nhật mật khẩu mới.
+     * Firebase yêu cầu re-authentication để bảo mật cho thao tác nhạy cảm này.
+     *
+     * @param currentPassword Mật khẩu hiện tại (dùng để re-authenticate)
+     * @param newPassword     Mật khẩu mới (phải ≥ 6 ký tự)
+     * @param callback        Kết quả trả về
+     */
+    public void changePassword(String currentPassword, String newPassword, OnAuthCallback callback) {
+        if (newPassword == null || newPassword.isEmpty()) {
+            callback.onError("Mật khẩu không được để trống.");
+            return;
+        }
+        if (newPassword.length() < 6) {
+            callback.onError("Mật khẩu phải có ít nhất 6 ký tự.");
+            return;
+        }
+
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
             callback.onError("Chưa đăng nhập");
             return;
         }
-        user.updatePassword(newPassword)
-                .addOnSuccessListener(unused -> callback.onSuccess())
+
+        String email = user.getEmail();
+        user.reauthenticate(getEmailCredential(email, currentPassword))
+                .addOnSuccessListener(unused ->
+                        user.updatePassword(newPassword)
+                                .addOnSuccessListener(v -> callback.onSuccess())
+                                .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)))
+                )
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 
-    public void deleteAccount(OnAuthCallback callback) {
+    /** Protected để cho phép override trong unit test (tránh Android TextUtils không mock được). */
+    protected com.google.firebase.auth.AuthCredential getEmailCredential(String email, String password) {
+        return EmailAuthProvider.getCredential(email, password);
+    }
+
+    /**
+     * Xóa tài khoản: re-authenticate → xóa Firestore document → xóa Auth user.
+     * Thứ tự bắt buộc: Firestore TRƯỚC Auth (sau khi xóa Auth, credentials bị hủy).
+     *
+     * @param currentPassword Mật khẩu hiện tại (dùng để re-authenticate)
+     * @param callback        Kết quả trả về
+     */
+    public void deleteAccount(String currentPassword, OnAuthCallback callback) {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
             callback.onError("Chưa đăng nhập");
             return;
         }
-        user.delete()
-                .addOnSuccessListener(unused -> callback.onSuccess())
+
+        String uid = user.getUid();
+        String email = user.getEmail();
+
+        user.reauthenticate(getEmailCredential(email, currentPassword))
+                .addOnSuccessListener(unused ->
+                        // Xóa Firestore document trước
+                        userRepository.deleteUser(uid, new UserRepository.OnCompleteCallback() {
+                            @Override
+                            public void onSuccess() {
+                                // Sau đó mới xóa Auth user
+                                user.delete()
+                                        .addOnSuccessListener(v -> callback.onSuccess())
+                                        .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
+                            }
+
+                            @Override
+                            public void onError(String errorMessage) {
+                                callback.onError(errorMessage);
+                            }
+                        })
+                )
                 .addOnFailureListener(e -> callback.onError(ErrorHandler.getAuthErrorMessage(e)));
     }
 }

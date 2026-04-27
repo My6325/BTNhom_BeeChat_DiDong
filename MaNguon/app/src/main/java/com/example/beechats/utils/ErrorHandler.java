@@ -2,6 +2,7 @@ package com.example.beechats.utils;
 
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.google.firebase.auth.FirebaseAuthInvalidUserException;
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException;
 
@@ -23,6 +24,9 @@ public class ErrorHandler {
         }
         if (e instanceof FirebaseAuthWeakPasswordException) {
             return "Mật khẩu phải có ít nhất 6 ký tự.";
+        }
+        if (e instanceof FirebaseAuthRecentLoginRequiredException) {
+            return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
         }
         if (e instanceof FirebaseAuthInvalidCredentialsException) {
             String errorCode = ((FirebaseAuthInvalidCredentialsException) e).getErrorCode();
