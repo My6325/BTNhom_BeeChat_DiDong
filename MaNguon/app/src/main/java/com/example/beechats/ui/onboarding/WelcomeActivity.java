@@ -12,6 +12,7 @@ import com.example.beechats.R;
 import com.example.beechats.data.repositories.ConversationRepository;
 import com.example.beechats.data.repositories.FirebaseAuthRepository;
 import com.example.beechats.data.repositories.MessageRepository;
+import com.google.firebase.firestore.ListenerRegistration;
 
 public class WelcomeActivity extends AppCompatActivity {
 
@@ -34,11 +35,11 @@ public class WelcomeActivity extends AppCompatActivity {
             }
         });
 
-        testSendMessage();
+        testListenMessages();
     }
 
     // =====================================================================
-    // TEST CODE — Task 2.2: Gửi tin nhắn text + cập nhật lastMessage
+    // TEST CODE — Task 2.3: listenToMessages (SnapshotListener)
     // Xóa sau khi verify trên Firebase Console
     // =====================================================================
 
@@ -46,103 +47,75 @@ public class WelcomeActivity extends AppCompatActivity {
     private static final String USER_A_EMAIL = "test.conv.a@beechat.com";
     private static final String USER_B_EMAIL = "test.conv.b@beechat.com";
     private static final String TEST_PASS = "ConvPass@1234";
-    private static final String TEST_MESSAGE = "Xin chào từ BeeChat Task 2.2!";
 
-    private void testSendMessage() {
+    // Lưu ListenerRegistration để detach trong onStop() — minh họa pattern production
+    private ListenerRegistration messagesListener;
+
+    private void testListenMessages() {
         FirebaseAuthRepository authRepo = new FirebaseAuthRepository();
         ConversationRepository convRepo = new ConversationRepository();
         MessageRepository msgRepo = new MessageRepository();
 
-        // Bước 1: xác thực User A (login hoặc register)
+        // Bước 1: login User A để lấy UID
         authRepo.login(USER_A_EMAIL, TEST_PASS, new FirebaseAuthRepository.OnAuthCallback() {
             @Override
             public void onSuccess() {
                 String uidA = authRepo.getCurrentUserId();
                 Log.d(TAG, "✅ Login User A OK, uid=" + uidA);
                 authRepo.logout();
-                getUidBThenSend(authRepo, convRepo, msgRepo, uidA);
+                getUidBAndListen(authRepo, convRepo, msgRepo, uidA);
             }
             @Override
             public void onError(String msg) {
-                Log.d(TAG, "ℹ️ Login User A thất bại, thử đăng ký: " + msg);
-                authRepo.register(USER_A_EMAIL, TEST_PASS, "User A Test", new FirebaseAuthRepository.OnAuthCallback() {
-                    @Override
-                    public void onSuccess() {
-                        String uidA = authRepo.getCurrentUserId();
-                        Log.d(TAG, "✅ Đăng ký User A OK, uid=" + uidA);
-                        authRepo.logout();
-                        getUidBThenSend(authRepo, convRepo, msgRepo, uidA);
-                    }
-                    @Override
-                    public void onError(String err) {
-                        Log.e(TAG, "❌ Không thể xác thực User A: " + err);
-                    }
-                });
+                Log.e(TAG, "❌ Login User A thất bại (cần có dữ liệu từ Task 2.2): " + msg);
             }
         });
     }
 
-    private void getUidBThenSend(FirebaseAuthRepository authRepo, ConversationRepository convRepo,
-                                  MessageRepository msgRepo, String uidA) {
+    private void getUidBAndListen(FirebaseAuthRepository authRepo, ConversationRepository convRepo,
+                                   MessageRepository msgRepo, String uidA) {
         authRepo.login(USER_B_EMAIL, TEST_PASS, new FirebaseAuthRepository.OnAuthCallback() {
             @Override
             public void onSuccess() {
                 String uidB = authRepo.getCurrentUserId();
                 Log.d(TAG, "✅ Login User B OK, uid=" + uidB);
-                doSendMessage(authRepo, convRepo, msgRepo, uidA, uidB);
+                // Bước 2: lấy/tạo conversation rồi gắn listener
+                convRepo.createOrGetPrivateConversation(uidA, uidB,
+                        new ConversationRepository.OnConversationCallback() {
+                            @Override
+                            public void onSuccess(String conversationId) {
+                                Log.d(TAG, "✅ Conversation ID: " + conversationId);
+                                // Bước 3: attach listener — lưu registration để detach sau
+                                messagesListener = msgRepo.listenToMessages(conversationId,
+                                        new MessageRepository.OnMessagesCallback() {
+                                            @Override
+                                            public void onSuccess(java.util.List<com.example.beechats.data.models.Message> messages) {
+                                                Log.d(TAG, "✅ Snapshot nhận được: " + messages.size() + " tin nhắn");
+                                                for (com.example.beechats.data.models.Message m : messages) {
+                                                    Log.d(TAG, "  → [" + m.getMessageId() + "] " + m.getText());
+                                                }
+                                                // Detach ngay sau snapshot đầu tiên (chỉ dùng cho test)
+                                                // Trong production: gọi messagesListener.remove() trong onStop()
+                                                if (messagesListener != null) {
+                                                    messagesListener.remove();
+                                                    Log.d(TAG, "✅ Listener đã detach");
+                                                }
+                                            }
+                                            @Override
+                                            public void onError(String err) {
+                                                Log.e(TAG, "❌ listenToMessages lỗi: " + err);
+                                            }
+                                        });
+                            }
+                            @Override
+                            public void onError(String err) {
+                                Log.e(TAG, "❌ Tạo conversation thất bại: " + err);
+                            }
+                        });
             }
             @Override
             public void onError(String msg) {
-                Log.d(TAG, "ℹ️ Login User B thất bại, thử đăng ký: " + msg);
-                authRepo.register(USER_B_EMAIL, TEST_PASS, "User B Test", new FirebaseAuthRepository.OnAuthCallback() {
-                    @Override
-                    public void onSuccess() {
-                        String uidB = authRepo.getCurrentUserId();
-                        Log.d(TAG, "✅ Đăng ký User B OK, uid=" + uidB);
-                        doSendMessage(authRepo, convRepo, msgRepo, uidA, uidB);
-                    }
-                    @Override
-                    public void onError(String err) {
-                        Log.e(TAG, "❌ Không thể xác thực User B: " + err);
-                    }
-                });
-            }
-        });
-    }
-
-    private void doSendMessage(FirebaseAuthRepository authRepo, ConversationRepository convRepo,
-                                MessageRepository msgRepo, String uidA, String uidB) {
-        // Bước 2: tạo hoặc lấy conversation giữa A và B
-        convRepo.createOrGetPrivateConversation(uidA, uidB, new ConversationRepository.OnConversationCallback() {
-            @Override
-            public void onSuccess(String conversationId) {
-                Log.d(TAG, "✅ Conversation OK: " + conversationId);
-                // Bước 3: gửi tin nhắn từ User A (cần login lại để có currentUser)
-                authRepo.login(USER_A_EMAIL, TEST_PASS, new FirebaseAuthRepository.OnAuthCallback() {
-                    @Override
-                    public void onSuccess() {
-                        msgRepo.sendMessage(conversationId, uidA, "User A Test", TEST_MESSAGE,
-                                new MessageRepository.OnSendMessageCallback() {
-                                    @Override
-                                    public void onSuccess(String messageId) {
-                                        Log.d(TAG, "✅ Gửi tin nhắn thành công! messageId=" + messageId);
-                                        Log.d(TAG, "→ Kiểm tra Firestore: conversations/" + conversationId + "/messages/" + messageId);
-                                    }
-                                    @Override
-                                    public void onError(String err) {
-                                        Log.e(TAG, "❌ Gửi tin nhắn thất bại: " + err);
-                                    }
-                                });
-                    }
-                    @Override
-                    public void onError(String err) {
-                        Log.e(TAG, "❌ Re-login User A thất bại: " + err);
-                    }
-                });
-            }
-            @Override
-            public void onError(String err) {
-                Log.e(TAG, "❌ Tạo conversation thất bại: " + err);
+                Log.e(TAG, "❌ Login User B thất bại: " + msg);
             }
         });
     }

@@ -2,8 +2,10 @@ package com.example.beechats.data.repositories;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -12,12 +14,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.beechats.data.models.Message;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.WriteBatch;
 
 import org.junit.Before;
@@ -27,6 +36,9 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -58,6 +70,18 @@ public class MessageRepositoryTest {
     @Mock
     private MessageRepository.OnSendMessageCallback mockCallback;
 
+    @Mock
+    private Query mockQuery;
+
+    @Mock
+    private ListenerRegistration mockListenerReg;
+
+    @Mock
+    private QuerySnapshot mockQuerySnapshot;
+
+    @Mock
+    private MessageRepository.OnMessagesCallback mockMsgCallback;
+
     @Captor
     private ArgumentCaptor<Map<String, Object>> mapCaptor;
 
@@ -85,6 +109,10 @@ public class MessageRepositoryTest {
         when(mockFirestore.batch()).thenReturn(mockBatch);
         when(mockBatch.set(any(DocumentReference.class), anyMap())).thenReturn(mockBatch);
         when(mockBatch.update(any(DocumentReference.class), anyMap())).thenReturn(mockBatch);
+
+        // Stub chain cho listenToMessages: mockMsgSubCollection.orderBy().limit() → mockQuery
+        when(mockMsgSubCollection.orderBy(anyString(), any(Query.Direction.class))).thenReturn(mockQuery);
+        when(mockQuery.limit(anyLong())).thenReturn(mockQuery);
 
         repository = new MessageRepository(mockFirestore);
     }
@@ -202,6 +230,122 @@ public class MessageRepositoryTest {
 
         verify(mockCallback).onError("Firestore network error");
         verify(mockCallback, never()).onSuccess(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC37: Snapshot có 2 documents → onSuccess(list) với size=2, messageId được set
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void listenToMessages_snapshotWithTwoDocs_callsOnSuccessWithList() {
+        DocumentSnapshot mockDoc1 = mock(DocumentSnapshot.class);
+        DocumentSnapshot mockDoc2 = mock(DocumentSnapshot.class);
+        Message msg1 = new Message();
+        msg1.setText("Xin chào");
+        Message msg2 = new Message();
+        msg2.setText("Hello");
+        when(mockDoc1.getId()).thenReturn("msgId1");
+        when(mockDoc1.toObject(Message.class)).thenReturn(msg1);
+        when(mockDoc2.getId()).thenReturn("msgId2");
+        when(mockDoc2.toObject(Message.class)).thenReturn(msg2);
+        when(mockQuerySnapshot.getDocuments()).thenReturn(Arrays.asList(mockDoc1, mockDoc2));
+
+        // Trigger EventListener ngay khi addSnapshotListener() được gọi
+        doAnswer(inv -> {
+            EventListener<QuerySnapshot> listener = inv.getArgument(0);
+            listener.onEvent(mockQuerySnapshot, null);
+            return mockListenerReg;
+        }).when(mockQuery).addSnapshotListener(any(EventListener.class));
+
+        repository.listenToMessages(CONV_ID, mockMsgCallback);
+
+        ArgumentCaptor<List<Message>> listCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mockMsgCallback).onSuccess(listCaptor.capture());
+        verify(mockMsgCallback, never()).onError(anyString());
+        assertEquals(2, listCaptor.getValue().size());
+        assertEquals("msgId1", listCaptor.getValue().get(0).getMessageId());
+        assertEquals("msgId2", listCaptor.getValue().get(1).getMessageId());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC38: listenToMessages() trả về ListenerRegistration không null
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void listenToMessages_validConvId_returnsNonNullRegistration() {
+        when(mockQuery.addSnapshotListener(any(EventListener.class))).thenReturn(mockListenerReg);
+
+        ListenerRegistration reg = repository.listenToMessages(CONV_ID, mockMsgCallback);
+
+        assertNotNull(reg);
+    }
+
+    // -----------------------------------------------------------------------
+    // TC39: conversationId null/rỗng → onError ngay, Firestore không gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void listenToMessages_nullConversationId_callsOnErrorWithoutFirestore() {
+        ListenerRegistration reg = repository.listenToMessages(null, mockMsgCallback);
+
+        verify(mockMsgCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockMsgCallback, never()).onSuccess(any());
+        assertNull(reg);
+    }
+
+    @Test
+    public void listenToMessages_emptyConversationId_callsOnErrorWithoutFirestore() {
+        ListenerRegistration reg = repository.listenToMessages("", mockMsgCallback);
+
+        verify(mockMsgCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockMsgCallback, never()).onSuccess(any());
+        assertNull(reg);
+    }
+
+    // -----------------------------------------------------------------------
+    // TC40: EventListener nhận FirebaseFirestoreException → onError(message)
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void listenToMessages_firestoreError_callsOnError() {
+        FirebaseFirestoreException mockException = mock(FirebaseFirestoreException.class);
+        when(mockException.getMessage()).thenReturn("Permission denied");
+
+        doAnswer(inv -> {
+            EventListener<QuerySnapshot> listener = inv.getArgument(0);
+            listener.onEvent(null, mockException);
+            return mockListenerReg;
+        }).when(mockQuery).addSnapshotListener(any(EventListener.class));
+
+        repository.listenToMessages(CONV_ID, mockMsgCallback);
+
+        verify(mockMsgCallback).onError("Permission denied");
+        verify(mockMsgCallback, never()).onSuccess(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC41: Snapshot rỗng (0 documents) → onSuccess(emptyList)
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void listenToMessages_emptySnapshot_callsOnSuccessWithEmptyList() {
+        when(mockQuerySnapshot.getDocuments()).thenReturn(Collections.emptyList());
+
+        doAnswer(inv -> {
+            EventListener<QuerySnapshot> listener = inv.getArgument(0);
+            listener.onEvent(mockQuerySnapshot, null);
+            return mockListenerReg;
+        }).when(mockQuery).addSnapshotListener(any(EventListener.class));
+
+        repository.listenToMessages(CONV_ID, mockMsgCallback);
+
+        ArgumentCaptor<List<Message>> listCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mockMsgCallback).onSuccess(listCaptor.capture());
+        assertTrue(listCaptor.getValue().isEmpty());
     }
 
     // -----------------------------------------------------------------------

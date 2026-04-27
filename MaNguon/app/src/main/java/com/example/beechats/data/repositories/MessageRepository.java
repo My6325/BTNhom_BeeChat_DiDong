@@ -1,17 +1,27 @@
 package com.example.beechats.data.repositories;
 
+import com.example.beechats.data.models.Message;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.WriteBatch;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MessageRepository {
 
     public interface OnSendMessageCallback {
         void onSuccess(String messageId);
+        void onError(String errorMessage);
+    }
+
+    public interface OnMessagesCallback {
+        void onSuccess(List<Message> messages);
         void onError(String errorMessage);
     }
 
@@ -93,5 +103,51 @@ public class MessageRepository {
         batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(messageId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Lắng nghe tin nhắn real-time trong hội thoại.
+     * Trả về ListenerRegistration — caller phải gọi .remove() trong onStop() để tránh memory leak.
+     *
+     * <p>Cách sử dụng:
+     * <pre>
+     *   // Trong onStart()/onResume():
+     *   listenerReg = msgRepo.listenToMessages(convId, callback);
+     *   // Trong onStop():
+     *   if (listenerReg != null) listenerReg.remove();
+     * </pre>
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param callback       Callback nhận danh sách tin nhắn mới nhất (giảm dần theo createdAt)
+     * @return ListenerRegistration để detach listener, hoặc null nếu conversationId không hợp lệ
+     */
+    public ListenerRegistration listenToMessages(String conversationId, OnMessagesCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return null;
+        }
+
+        return db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(30)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        callback.onError(error.getMessage());
+                        return;
+                    }
+                    List<Message> messages = new ArrayList<>();
+                    if (snapshots != null) {
+                        for (com.google.firebase.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
+                            Message msg = doc.toObject(Message.class);
+                            if (msg != null) {
+                                msg.setMessageId(doc.getId());
+                                messages.add(msg);
+                            }
+                        }
+                    }
+                    callback.onSuccess(messages);
+                });
     }
 }
