@@ -59,7 +59,7 @@
         android:textSize="20sp"
         android:textColor="@color/black"
         app:backgroundTint="@null"
-        android:background="@drawable/btn_khung"/>
+        android:background="@drawable/btn_khung_white"/>
 
     <TextView
         android:layout_width="wrap_content"
@@ -79,5 +79,5 @@
         android:textSize="20sp"
         android:textColor="@color/black"
         app:backgroundTint="@null"
-        android:background="@drawable/btn_khung"/>
+        android:background="@drawable/btn_khung_white"/>
 </LinearLayout>

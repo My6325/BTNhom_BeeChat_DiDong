@@ -58,7 +58,7 @@
 
             <TextView
                 style="@style/LabelStyle"
-                android:text="Địa chỉ mail?SĐT:"
+                android:text="Địa chỉ mail/SĐT:"
                 android:layout_width="match_parent"
                 android:layout_marginStart="8dp"/>
             <EditText
@@ -115,7 +115,7 @@
                     android:id="@+id/cbAgree"
                     android:layout_width="35dp"
                     android:layout_height="30dp"
-                    android:background="@drawable/btn_khung"
+                    android:background="@drawable/btn_khung_white"
                     android:checked="false"
                     android:button="@null"
                     android:layout_marginEnd="10dp"/>
@@ -135,7 +135,7 @@
                 android:layout_width="250dp"
                 android:layout_height="50dp"
                 android:layout_gravity="center_horizontal"
-                android:background="@drawable/btn_khung"
+                android:background="@drawable/btn_khung_white"
                 app:backgroundTint="@null"
                 android:layout_marginTop="25dp"
                 android:text="@string/sign_up"

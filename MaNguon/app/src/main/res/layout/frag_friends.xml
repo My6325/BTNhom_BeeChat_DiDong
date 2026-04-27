@@ -1,24 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
     android:padding="13dp">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_online_users"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="15dp"
-        android:paddingHorizontal="5dp"
-        android:clipToPadding="false"
-        tools:listitem="@layout/layout_avatar_user"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
-
     <com.google.android.material.tabs.TabLayout
-        android:id="@+id/tabLayout"
+        android:id="@+id/tabLayoutFriends"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:tabTextColor="@color/gray_dam"
@@ -26,11 +15,12 @@
         app:tabIndicatorColor="@color/black"
         app:tabIndicatorHeight="3dp"
         app:tabIndicatorFullWidth="false"
-        style="@style/LabelMenu"/>
+        app:tabTextAppearance="@style/LabelMenu" />
 
     <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/viewPager"
+        android:id="@+id/viewPagerFriends"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="10dp" />
+
 </LinearLayout>

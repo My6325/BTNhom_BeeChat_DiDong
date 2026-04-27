@@ -29,10 +29,12 @@
         <activity android:name=".ui.onboarding.IntroduceQrActivity" android:exported="false" />
         <activity android:name=".ui.onboarding.IntroduceSettingActivity" android:exported="false" />
         <activity android:name=".ui.onboarding.IntroduceMailActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.QRCode_Activity" android:exported="false" />
+
 
         <!-- Màn hình xác thực -->
         <activity android:name=".ui.auth.LoginActivity" android:exported="false" />
         <activity android:name=".ui.onboarding.Register_Activity" android:exported="false" android:windowSoftInputMode="adjustPan"/>
         <activity android:name=".ui.onboarding.ForgetPassword" android:exported="false" android:windowSoftInputMode="adjustPan" />
     </application>
-</manifest>
+</manifest>

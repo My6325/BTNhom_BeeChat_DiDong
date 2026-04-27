@@ -10,7 +10,10 @@ import androidx.fragment.app.Fragment;
 import com.example.beechats.R;
 import com.example.beechats.ui.auth.LoginActivity;
 import com.example.beechats.ui.chat.ChatListFragment;
+import com.example.beechats.ui.friend.FriendsFragment;
 import com.example.beechats.ui.onboarding.WelcomeActivity;
+import com.example.beechats.ui.onboarding.QRCode_Activity;
+import android.widget.ImageView;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -55,6 +58,12 @@ public class MainActivity extends AppCompatActivity {
 
         // Ánh xạ View từ layout activity_main.xml
         bottomNavigationView = findViewById(R.id.bottom_navigation);
+        ImageView imgScanQr = findViewById(R.id.img_scan_qr);
+
+        imgScanQr.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, QRCode_Activity.class);
+            startActivity(intent);
+        });
 
         // Thiết lập màn hình mặc định khi vừa mở App (Tab Tin nhắn)
         if (savedInstanceState == null) {
@@ -71,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.menu_chat) {
                 selectedFragment = new ChatListFragment();
             } else if (itemId == R.id.menu_friends) {
+                selectedFragment = new FriendsFragment();
             } else if (itemId == R.id.menu_settings) {
             }
 

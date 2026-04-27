@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginVertical="10dp">
+
+    <include
+        android:id="@+id/avaUser"
+        layout="@layout/layout_avatar_user"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="15dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/txtNameFriend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/txtHuyKB"
+                android:text="@string/huy_kb"
+                style="@style/LabelFriend"
+                android:textColor="@color/black"/>
+
+            <TextView
+                android:id="@+id/txtNhanTin"
+                style="@style/LabelFriend"
+                android:textColor="@color/black"
+                android:text="@string/nhan_tin"/>
+
+            <TextView
+                android:id="@+id/txtBlock"
+                android:text="@string/block"
+                style="@style/LabelFriend"
+                android:textColor="@color/black"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
