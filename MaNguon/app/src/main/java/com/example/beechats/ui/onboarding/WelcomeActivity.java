@@ -12,7 +12,6 @@ import com.example.beechats.R;
 import com.example.beechats.data.repositories.ConversationRepository;
 import com.example.beechats.data.repositories.FirebaseAuthRepository;
 import com.example.beechats.data.repositories.MessageRepository;
-import com.google.firebase.firestore.ListenerRegistration;
 
 public class WelcomeActivity extends AppCompatActivity {
 
@@ -35,11 +34,11 @@ public class WelcomeActivity extends AppCompatActivity {
             }
         });
 
-        testListenMessages();
+        testMessageStatus();
     }
 
     // =====================================================================
-    // TEST CODE — Task 2.3: listenToMessages (SnapshotListener)
+    // TEST CODE — Task 2.4: Trạng thái tin nhắn (sent → delivered → read)
     // Xóa sau khi verify trên Firebase Console
     // =====================================================================
 
@@ -48,76 +47,111 @@ public class WelcomeActivity extends AppCompatActivity {
     private static final String USER_B_EMAIL = "test.conv.b@beechat.com";
     private static final String TEST_PASS = "ConvPass@1234";
 
-    // Lưu ListenerRegistration để detach trong onStop() — minh họa pattern production
-    private ListenerRegistration messagesListener;
-
-    private void testListenMessages() {
+    private void testMessageStatus() {
         FirebaseAuthRepository authRepo = new FirebaseAuthRepository();
         ConversationRepository convRepo = new ConversationRepository();
         MessageRepository msgRepo = new MessageRepository();
 
-        // Bước 1: login User A để lấy UID
+        // Bước 1: Login A để lấy UID, sau đó logout
         authRepo.login(USER_A_EMAIL, TEST_PASS, new FirebaseAuthRepository.OnAuthCallback() {
             @Override
             public void onSuccess() {
                 String uidA = authRepo.getCurrentUserId();
                 Log.d(TAG, "✅ Login User A OK, uid=" + uidA);
                 authRepo.logout();
-                getUidBAndListen(authRepo, convRepo, msgRepo, uidA);
+                getUidBAndTest(authRepo, convRepo, msgRepo, uidA);
             }
             @Override
             public void onError(String msg) {
-                Log.e(TAG, "❌ Login User A thất bại (cần có dữ liệu từ Task 2.2): " + msg);
+                Log.e(TAG, "❌ Login User A thất bại: " + msg);
             }
         });
     }
 
-    private void getUidBAndListen(FirebaseAuthRepository authRepo, ConversationRepository convRepo,
-                                   MessageRepository msgRepo, String uidA) {
+    private void getUidBAndTest(FirebaseAuthRepository authRepo, ConversationRepository convRepo,
+                                MessageRepository msgRepo, String uidA) {
+        // Bước 2: Login B để lấy UID
         authRepo.login(USER_B_EMAIL, TEST_PASS, new FirebaseAuthRepository.OnAuthCallback() {
             @Override
             public void onSuccess() {
                 String uidB = authRepo.getCurrentUserId();
                 Log.d(TAG, "✅ Login User B OK, uid=" + uidB);
-                // Bước 2: lấy/tạo conversation rồi gắn listener
-                convRepo.createOrGetPrivateConversation(uidA, uidB,
-                        new ConversationRepository.OnConversationCallback() {
-                            @Override
-                            public void onSuccess(String conversationId) {
-                                Log.d(TAG, "✅ Conversation ID: " + conversationId);
-                                // Bước 3: attach listener — lưu registration để detach sau
-                                messagesListener = msgRepo.listenToMessages(conversationId,
-                                        new MessageRepository.OnMessagesCallback() {
-                                            @Override
-                                            public void onSuccess(java.util.List<com.example.beechats.data.models.Message> messages) {
-                                                Log.d(TAG, "✅ Snapshot nhận được: " + messages.size() + " tin nhắn");
-                                                for (com.example.beechats.data.models.Message m : messages) {
-                                                    Log.d(TAG, "  → [" + m.getMessageId() + "] " + m.getText());
-                                                }
-                                                // Detach ngay sau snapshot đầu tiên (chỉ dùng cho test)
-                                                // Trong production: gọi messagesListener.remove() trong onStop()
-                                                if (messagesListener != null) {
-                                                    messagesListener.remove();
-                                                    Log.d(TAG, "✅ Listener đã detach");
-                                                }
-                                            }
-                                            @Override
-                                            public void onError(String err) {
-                                                Log.e(TAG, "❌ listenToMessages lỗi: " + err);
-                                            }
-                                        });
-                            }
-                            @Override
-                            public void onError(String err) {
-                                Log.e(TAG, "❌ Tạo conversation thất bại: " + err);
-                            }
-                        });
+                authRepo.logout();
+
+                // Bước 3: Login lại A để gửi tin nhắn (cần đúng auth context)
+                authRepo.login(USER_A_EMAIL, TEST_PASS, new FirebaseAuthRepository.OnAuthCallback() {
+                    @Override
+                    public void onSuccess() {
+                        Log.d(TAG, "✅ Re-login User A OK");
+                        convRepo.createOrGetPrivateConversation(uidA, uidB,
+                                new ConversationRepository.OnConversationCallback() {
+                                    @Override
+                                    public void onSuccess(String convId) {
+                                        Log.d(TAG, "✅ Conversation ID: " + convId);
+                                        sendAndMarkStatus(msgRepo, convId, uidA, uidB);
+                                    }
+                                    @Override
+                                    public void onError(String err) {
+                                        Log.e(TAG, "❌ Tạo conversation thất bại: " + err);
+                                    }
+                                });
+                    }
+                    @Override
+                    public void onError(String msg) {
+                        Log.e(TAG, "❌ Re-login User A thất bại: " + msg);
+                    }
+                });
             }
             @Override
             public void onError(String msg) {
                 Log.e(TAG, "❌ Login User B thất bại: " + msg);
             }
         });
+    }
+
+    private void sendAndMarkStatus(MessageRepository msgRepo, String convId,
+                                   String uidA, String uidB) {
+        // Bước 4: Gửi tin nhắn (TC1 → status="sent" tự động)
+        msgRepo.sendMessage(convId, uidA, "User A Test", "Task 2.4: test message status",
+                new MessageRepository.OnSendMessageCallback() {
+                    @Override
+                    public void onSuccess(String messageId) {
+                        Log.d(TAG, "✅ Gửi tin thành công, messageId=" + messageId + " (status=sent)");
+
+                        // Bước 5: markDelivered — TC2: đối phương online → status="delivered"
+                        msgRepo.markDelivered(convId, messageId,
+                                new MessageRepository.OnMessageStatusCallback() {
+                                    @Override
+                                    public void onSuccess() {
+                                        Log.d(TAG, "✅ markDelivered OK → status=delivered");
+
+                                        // Bước 6: markAsRead — TC3: đối phương mở chat → status="read"
+                                        msgRepo.markAsRead(convId, uidB,
+                                                new MessageRepository.OnMessageStatusCallback() {
+                                                    @Override
+                                                    public void onSuccess() {
+                                                        Log.d(TAG, "✅ markAsRead OK → status=read, readBy có uid=" + uidB);
+                                                        Log.d(TAG, "✅ Task 2.4 hoàn tất! Kiểm tra Firebase Console:");
+                                                        Log.d(TAG, "   conversations/" + convId + "/messages/" + messageId);
+                                                        Log.d(TAG, "   → status=read, readBy." + uidB + "=timestamp");
+                                                    }
+                                                    @Override
+                                                    public void onError(String err) {
+                                                        Log.e(TAG, "❌ markAsRead thất bại: " + err);
+                                                    }
+                                                });
+                                    }
+                                    @Override
+                                    public void onError(String err) {
+                                        Log.e(TAG, "❌ markDelivered thất bại: " + err);
+                                    }
+                                });
+                    }
+                    @Override
+                    public void onError(String err) {
+                        Log.e(TAG, "❌ Gửi tin thất bại: " + err);
+                    }
+                });
     }
     // =====================================================================
     // END TEST CODE

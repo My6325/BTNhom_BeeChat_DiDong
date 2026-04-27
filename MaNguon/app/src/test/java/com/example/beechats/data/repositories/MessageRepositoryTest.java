@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +83,18 @@ public class MessageRepositoryTest {
     @Mock
     private MessageRepository.OnMessagesCallback mockMsgCallback;
 
+    /** DocumentReference cho message cụ thể (markDelivered dùng .document(messageId)) */
+    @Mock
+    private DocumentReference mockSpecificMsgRef;
+
+    /** Query trả về từ .whereIn() (markAsRead) */
+    @Mock
+    private Query mockWhereInQuery;
+
+    /** Callback cho markDelivered / markAsRead */
+    @Mock
+    private MessageRepository.OnMessageStatusCallback mockStatusCallback;
+
     @Captor
     private ArgumentCaptor<Map<String, Object>> mapCaptor;
 
@@ -113,6 +126,12 @@ public class MessageRepositoryTest {
         // Stub chain cho listenToMessages: mockMsgSubCollection.orderBy().limit() → mockQuery
         when(mockMsgSubCollection.orderBy(anyString(), any(Query.Direction.class))).thenReturn(mockQuery);
         when(mockQuery.limit(anyLong())).thenReturn(mockQuery);
+
+        // Stub cho markDelivered: mockMsgSubCollection.document(messageId) → mockSpecificMsgRef
+        when(mockMsgSubCollection.document(anyString())).thenReturn(mockSpecificMsgRef);
+
+        // Stub cho markAsRead: mockMsgSubCollection.whereIn(...) → mockWhereInQuery
+        when(mockMsgSubCollection.whereIn(anyString(), any())).thenReturn(mockWhereInQuery);
 
         repository = new MessageRepository(mockFirestore);
     }
@@ -349,6 +368,193 @@ public class MessageRepositoryTest {
     }
 
     // -----------------------------------------------------------------------
+    // TC42: markDelivered — tham số hợp lệ → update() gọi → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markDelivered_validParams_callsUpdateAndOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.markDelivered(CONV_ID, TEST_MESSAGE_ID, mockStatusCallback);
+
+        verify(mockSpecificMsgRef).update(anyMap());
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC43: markDelivered — conversationId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markDelivered_nullConversationId_callsOnErrorWithoutFirestore() {
+        repository.markDelivered(null, TEST_MESSAGE_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    @Test
+    public void markDelivered_emptyConversationId_callsOnErrorWithoutFirestore() {
+        repository.markDelivered("", TEST_MESSAGE_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC44: markDelivered — messageId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markDelivered_nullMessageId_callsOnErrorWithoutFirestore() {
+        repository.markDelivered(CONV_ID, null, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID tin nhắn không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    @Test
+    public void markDelivered_emptyMessageId_callsOnErrorWithoutFirestore() {
+        repository.markDelivered(CONV_ID, "", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID tin nhắn không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC45: markDelivered — Firestore update() fails → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markDelivered_firestoreFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.markDelivered(CONV_ID, TEST_MESSAGE_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Network error");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC46: markAsRead — 2 tin chưa đọc → batch.commit() gọi 2 lần update → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markAsRead_withUnreadMessages_callsBatchCommitAndOnSuccess() {
+        DocumentSnapshot mockUnreadDoc1 = mock(DocumentSnapshot.class);
+        DocumentSnapshot mockUnreadDoc2 = mock(DocumentSnapshot.class);
+        DocumentReference mockDocRef1 = mock(DocumentReference.class);
+        DocumentReference mockDocRef2 = mock(DocumentReference.class);
+        when(mockUnreadDoc1.getReference()).thenReturn(mockDocRef1);
+        when(mockUnreadDoc2.getReference()).thenReturn(mockDocRef2);
+
+        QuerySnapshot mockStatusSnapshot = mock(QuerySnapshot.class);
+        when(mockStatusSnapshot.isEmpty()).thenReturn(false);
+        when(mockStatusSnapshot.getDocuments()).thenReturn(Arrays.asList(mockUnreadDoc1, mockUnreadDoc2));
+
+        // Tạo task trước, sau đó mới stub — tránh UnfinishedStubbingException
+        Task<QuerySnapshot> queryTask46 = buildQuerySuccessTask(mockStatusSnapshot);
+        when(mockWhereInQuery.get()).thenReturn(queryTask46);
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.markAsRead(CONV_ID, "userB", mockStatusCallback);
+
+        // Mỗi doc được update 1 lần, tổng 2 lần
+        verify(mockBatch, times(2)).update(any(DocumentReference.class), anyMap());
+        verify(mockBatch).commit();
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC47: markAsRead — không có tin chưa đọc → onSuccess() ngay, batch.commit() không gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markAsRead_noUnreadMessages_callsOnSuccessWithoutBatch() {
+        QuerySnapshot mockStatusSnapshot = mock(QuerySnapshot.class);
+        when(mockStatusSnapshot.isEmpty()).thenReturn(true);
+
+        // Tạo task trước, sau đó mới stub — tránh UnfinishedStubbingException
+        Task<QuerySnapshot> queryTask47 = buildQuerySuccessTask(mockStatusSnapshot);
+        when(mockWhereInQuery.get()).thenReturn(queryTask47);
+
+        repository.markAsRead(CONV_ID, "userB", mockStatusCallback);
+
+        verify(mockBatch, never()).commit();
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC48: markAsRead — conversationId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markAsRead_nullConversationId_callsOnErrorWithoutFirestore() {
+        repository.markAsRead(null, "userB", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    @Test
+    public void markAsRead_emptyConversationId_callsOnErrorWithoutFirestore() {
+        repository.markAsRead("", "userB", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC49: markAsRead — userId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markAsRead_nullUserId_callsOnErrorWithoutFirestore() {
+        repository.markAsRead(CONV_ID, null, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    @Test
+    public void markAsRead_emptyUserId_callsOnErrorWithoutFirestore() {
+        repository.markAsRead(CONV_ID, "", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC50: markAsRead — Firestore query .get() fails → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void markAsRead_queryFails_callsOnError() {
+        Exception exception = new Exception("Query failed");
+        // Tạo task trước, sau đó mới stub — tránh UnfinishedStubbingException
+        Task<QuerySnapshot> queryTask50 = buildQueryFailureTask(exception);
+        when(mockWhereInQuery.get()).thenReturn(queryTask50);
+
+        repository.markAsRead(CONV_ID, "userB", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Query failed");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockBatch, never()).commit();
+    }
+
+    // -----------------------------------------------------------------------
     // Helper: tạo mock Task<Void> thành công
     // -----------------------------------------------------------------------
 
@@ -370,6 +576,36 @@ public class MessageRepositoryTest {
     @SuppressWarnings("unchecked")
     private Task<Void> buildVoidFailureTask(Exception exception) {
         Task<Void> mockTask = mock(Task.class);
+        when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
+        doAnswer(inv -> {
+            ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
+            return mockTask;
+        }).when(mockTask).addOnFailureListener(any(OnFailureListener.class));
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<QuerySnapshot> thành công
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<QuerySnapshot> buildQuerySuccessTask(QuerySnapshot snapshot) {
+        Task<QuerySnapshot> mockTask = mock(Task.class);
+        doAnswer(inv -> {
+            ((OnSuccessListener<QuerySnapshot>) inv.getArgument(0)).onSuccess(snapshot);
+            return mockTask;
+        }).when(mockTask).addOnSuccessListener(any(OnSuccessListener.class));
+        when(mockTask.addOnFailureListener(any(OnFailureListener.class))).thenReturn(mockTask);
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<QuerySnapshot> thất bại
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<QuerySnapshot> buildQueryFailureTask(Exception exception) {
+        Task<QuerySnapshot> mockTask = mock(Task.class);
         when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
         doAnswer(inv -> {
             ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
