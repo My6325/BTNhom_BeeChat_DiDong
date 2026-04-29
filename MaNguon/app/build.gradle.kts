@@ -33,6 +33,13 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    testOptions {
+        unitTests {
+            // Cho phép android.util.Log và các Android SDK stub trả default value
+            // thay vì throw RuntimeException trong unit tests
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -52,4 +59,6 @@ dependencies {
     implementation("com.cloudinary:cloudinary-android:3.1.2") // Cho lưu trữ media (thay Firebase Storage)
     implementation("com.github.bumptech.glide:glide:4.16.0") // Cho tải ảnh
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0") // Cho Glide annotation processing
+    // ProcessLifecycleOwner — theo dõi foreground/background của toàn bộ app
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
 }

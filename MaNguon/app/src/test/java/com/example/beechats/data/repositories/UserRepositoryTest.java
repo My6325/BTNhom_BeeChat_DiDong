@@ -152,6 +152,54 @@ public class UserRepositoryTest {
     }
 
     // -----------------------------------------------------------------------
+    // TC54: updateOnlineStatus — isOnline=true + Firestore success → onSuccess() được gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateOnlineStatus_onlineTrue_firestoreSuccess_callsOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockDocument.update(anyMap())).thenReturn(updateTask);
+
+        repository.updateOnlineStatus("uid-001", true, mockCallback);
+
+        verify(mockDocument).update(anyMap());
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC55: updateOnlineStatus — isOnline=false + Firestore success → onSuccess() được gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateOnlineStatus_onlineFalse_firestoreSuccess_callsOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockDocument.update(anyMap())).thenReturn(updateTask);
+
+        repository.updateOnlineStatus("uid-001", false, mockCallback);
+
+        verify(mockDocument).update(anyMap());
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC56: updateOnlineStatus — Firestore fail → onError(errorMessage) được gọi
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateOnlineStatus_firestoreFails_callsOnErrorWithMessage() {
+        Exception exception = new Exception("Network timeout");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockDocument.update(anyMap())).thenReturn(updateTask);
+
+        repository.updateOnlineStatus("uid-001", true, mockCallback);
+
+        verify(mockCallback).onError("Network timeout");
+        verify(mockCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
     // Helper: tạo mock Task<Void> thành công
     // -----------------------------------------------------------------------
 
