@@ -37,8 +37,10 @@
         <item name="android:layout_marginStart">15dp</item>
         <item name="android:textSize">13sp</item>
     </style>
-
     <style name="TransparentActiveIndicator">
         <item name="android:color">@android:color/transparent</item>
+    </style>
+    <style name="CircleStyle">
+        <item name="cornerSize">50%</item>
     </style>
 </resources>
