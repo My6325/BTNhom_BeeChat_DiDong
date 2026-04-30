@@ -9,6 +9,7 @@ import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.WriteBatch;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,11 @@ public class MessageRepository {
 
     public interface OnMessagesCallback {
         void onSuccess(List<Message> messages);
+        void onError(String errorMessage);
+    }
+
+    public interface OnMessageStatusCallback {
+        void onSuccess();
         void onError(String errorMessage);
     }
 
@@ -149,5 +155,87 @@ public class MessageRepository {
                     }
                     callback.onSuccess(messages);
                 });
+    }
+
+    /**
+     * Cập nhật trạng thái tin nhắn cụ thể sang "delivered".
+     * Gọi khi đối phương online và nhận được tin nhắn.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param messageId      ID tin nhắn cần cập nhật (không được rỗng)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void markDelivered(String conversationId, String messageId,
+                              OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (messageId == null || messageId.trim().isEmpty()) {
+            callback.onError("ID tin nhắn không hợp lệ.");
+            return;
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "delivered");
+        updates.put("updatedAt", FieldValue.serverTimestamp());
+
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .document(messageId)
+                .update(updates)
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Đánh dấu toàn bộ tin nhắn chưa đọc trong hội thoại là "read".
+     * Dùng WriteBatch để cập nhật atomic. Ghi thêm readBy.{userId}=serverTimestamp() cho group chat.
+     * Nếu không có tin nhắn nào cần đánh dấu, gọi onSuccess() ngay mà không tạo batch.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param userId         UID người đọc (không được rỗng)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void markAsRead(String conversationId, String userId,
+                           OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        // Query tất cả tin nhắn chưa được đọc (sent hoặc delivered)
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .whereIn("status", Arrays.asList("sent", "delivered"))
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot.isEmpty()) {
+                        // Không có tin nhắn nào cần cập nhật
+                        callback.onSuccess();
+                        return;
+                    }
+
+                    // Batch update tất cả: status=read + readBy.userId=serverTimestamp()
+                    WriteBatch batch = db.batch();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("status", "read");
+                        updates.put("readBy." + userId.trim(), FieldValue.serverTimestamp());
+                        updates.put("updatedAt", FieldValue.serverTimestamp());
+                        batch.update(doc.getReference(), updates);
+                    }
+
+                    batch.commit()
+                            .addOnSuccessListener(unused -> callback.onSuccess())
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                })
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 }
