@@ -15,10 +15,14 @@ import com.example.beechats.ui.chat.ChatListFragment;
 import com.example.beechats.ui.friend.FriendsFragment;
 import com.example.beechats.ui.onboarding.WelcomeActivity;
 import com.example.beechats.ui.onboarding.QRCode_Activity;
+import com.example.beechats.ui.setting.SettingsFragment;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import android.view.View;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -32,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     // =====================================================================
 
     private BottomNavigationView bottomNavigationView;
+    private LinearLayout headerContainer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
     private void initMainUI() {
         setContentView(R.layout.activity_main);
         bottomNavigationView = findViewById(R.id.bottom_navigation);
+        headerContainer = findViewById(R.id.header_container);
         ImageView imgScanQr = findViewById(R.id.img_scan_qr);
 
         imgScanQr.setOnClickListener(v ->
@@ -78,8 +84,13 @@ public class MainActivity extends AppCompatActivity {
             int itemId = item.getItemId();
             if (itemId == R.id.menu_chat) {
                 selectedFragment = new ChatListFragment();
+                headerContainer.setVisibility(View.VISIBLE);
             } else if (itemId == R.id.menu_friends) {
                 selectedFragment = new FriendsFragment();
+                headerContainer.setVisibility(View.VISIBLE);
+            } else if (itemId == R.id.menu_settings) {
+                selectedFragment = new SettingsFragment();
+                headerContainer.setVisibility(View.GONE);
             }
             if (selectedFragment != null) {
                 getSupportFragmentManager().beginTransaction()

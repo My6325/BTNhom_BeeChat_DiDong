@@ -28,4 +28,8 @@
     <string name="block">Chặn</string>
     <string name="ql">Quản lý</string>
     <string name="xem_all">Xem tất cả</string>
+    <string name="bee_menu">Bee-Menu</string>
+    <string name="che_do">Chế độ tối</string>
+    <string name="trang_thai">Trạng thái hoạt động</string>
+    <string name="notice_sound">Thông báo và âm thanh</string>
 </resources>

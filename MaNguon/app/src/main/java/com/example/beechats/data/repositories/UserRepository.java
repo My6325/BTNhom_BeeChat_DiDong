@@ -1,6 +1,7 @@
 package com.example.beechats.data.repositories;
 
 import com.example.beechats.data.models.User;
+import com.example.beechats.data.models.UserSettings;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -15,11 +16,13 @@ public class UserRepository {
 
     public interface OnUserCallback {
         void onSuccess(User user);
+
         void onError(String errorMessage);
     }
 
     public interface OnCompleteCallback {
         void onSuccess();
+
         void onError(String errorMessage);
     }
 
@@ -71,7 +74,8 @@ public class UserRepository {
     }
 
     /**
-     * Cập nhật thông tin profile: displayName, bio và tự động tái sinh searchKeywords.
+     * Cập nhật thông tin profile: displayName, bio và tự động tái sinh
+     * searchKeywords.
      * Validate displayName không được rỗng.
      *
      * @param userId      UID của người dùng
@@ -138,6 +142,21 @@ public class UserRepository {
     }
 
     /**
+     * Cập nhật cài đặt người dùng.
+     *
+     * @param userId   UID của người dùng
+     * @param settings Object UserSettings mới
+     * @param callback Kết quả trả về
+     */
+    public void updateSettings(String userId, UserSettings settings, OnCompleteCallback callback) {
+        db.collection(COLLECTION)
+                .document(userId)
+                .update("settings", settings)
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Xóa document người dùng khỏi Firestore.
      * Gọi trước khi xóa Auth user để tránh mất quyền ghi.
      *
@@ -162,7 +181,8 @@ public class UserRepository {
      */
     public static List<String> generateSearchKeywords(String displayName) {
         List<String> keywords = new ArrayList<>();
-        if (displayName == null || displayName.isEmpty()) return keywords;
+        if (displayName == null || displayName.isEmpty())
+            return keywords;
 
         // Bỏ dấu tiếng Việt, lowercase
         String normalized = Normalizer.normalize(displayName, Normalizer.Form.NFD);
@@ -172,7 +192,8 @@ public class UserRepository {
         // Sinh prefix cho từng từ
         String[] words = normalized.split("\\s+");
         for (String word : words) {
-            if (word.isEmpty()) continue;
+            if (word.isEmpty())
+                continue;
             for (int i = 1; i <= word.length(); i++) {
                 keywords.add(word.substring(0, i));
             }
