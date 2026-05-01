@@ -1,6 +1,7 @@
 package com.example.beechats.data.repositories;
 
 import com.example.beechats.data.models.Message;
+import com.example.beechats.data.models.ReplyInfo;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -106,6 +107,89 @@ public class MessageRepository {
         batch.update(convRef, convUpdate);
 
         String messageId = msgRef.getId();
+        batch.commit()
+                .addOnSuccessListener(unused -> callback.onSuccess(messageId))
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Gửi tin nhắn reply/quote kèm thông tin tin nhắn gốc.
+     * Nếu tin gốc đã bị thu hồi (text == null), preview tự động là "[Tin nhắn đã thu hồi]".
+     * Dùng WriteBatch để đảm bảo atomic: tạo message + cập nhật lastMessage trong conversation.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param senderId       UID người gửi (không được rỗng)
+     * @param senderName     Tên người gửi
+     * @param text           Nội dung tin nhắn reply (không được rỗng)
+     * @param replyTo        Thông tin tin nhắn gốc (không được null, messageId không được rỗng)
+     * @param callback       Kết quả trả về (onSuccess với messageId, hoặc onError)
+     */
+    public void sendReplyMessage(String conversationId, String senderId, String senderName,
+                                 String text, ReplyInfo replyTo, OnSendMessageCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (senderId == null || senderId.trim().isEmpty()) {
+            callback.onError("ID người gửi không hợp lệ.");
+            return;
+        }
+        if (text == null || text.trim().isEmpty()) {
+            callback.onError("Nội dung tin nhắn không được để trống.");
+            return;
+        }
+        if (replyTo == null) {
+            callback.onError("Thông tin tin nhắn gốc không hợp lệ.");
+            return;
+        }
+        if (replyTo.getMessageId() == null || replyTo.getMessageId().trim().isEmpty()) {
+            callback.onError("ID tin nhắn gốc không hợp lệ.");
+            return;
+        }
+
+        // Nếu tin gốc đã bị thu hồi (text bị xóa), hiển thị placeholder
+        String replyPreview = replyTo.getText() != null ? replyTo.getText() : "[Tin nhắn đã thu hồi]";
+
+        DocumentReference msgRef = db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .document();
+
+        DocumentReference convRef = db.collection(CONV_COLLECTION)
+                .document(conversationId);
+
+        // replyTo map lưu dạng Map để Firestore serialize đúng cấu trúc
+        Map<String, Object> replyToMap = new HashMap<>();
+        replyToMap.put("messageId", replyTo.getMessageId().trim());
+        replyToMap.put("text", replyPreview);
+        replyToMap.put("senderId", replyTo.getSenderId() != null ? replyTo.getSenderId() : "");
+        replyToMap.put("senderName", replyTo.getSenderName() != null ? replyTo.getSenderName() : "");
+
+        Map<String, Object> msgData = new HashMap<>();
+        msgData.put("senderId", senderId.trim());
+        msgData.put("senderName", senderName != null ? senderName : "");
+        msgData.put("text", text.trim());
+        msgData.put("type", "text");
+        msgData.put("status", "sent");
+        msgData.put("replyTo", replyToMap);
+        msgData.put("createdAt", FieldValue.serverTimestamp());
+        msgData.put("updatedAt", FieldValue.serverTimestamp());
+
+        Map<String, Object> lastMessage = new HashMap<>();
+        lastMessage.put("text", text.trim());
+        lastMessage.put("senderId", senderId.trim());
+        lastMessage.put("senderName", senderName != null ? senderName : "");
+        lastMessage.put("type", "text");
+        lastMessage.put("timestamp", FieldValue.serverTimestamp());
+
+        Map<String, Object> convUpdate = new HashMap<>();
+        convUpdate.put("lastMessage", lastMessage);
+        convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+
+        String messageId = msgRef.getId();
+        WriteBatch batch = db.batch();
+        batch.set(msgRef, msgData);
+        batch.update(convRef, convUpdate);
         batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(messageId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));

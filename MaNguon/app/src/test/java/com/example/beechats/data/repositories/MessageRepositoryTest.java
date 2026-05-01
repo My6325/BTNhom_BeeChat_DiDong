@@ -16,6 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.beechats.data.models.Message;
+import com.example.beechats.data.models.ReplyInfo;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -806,5 +807,175 @@ public class MessageRepositoryTest {
 
         verify(mockStatusCallback).onError("Firestore update failed");
         verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC66: sendReplyMessage — conversationId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void sendReplyMessage_nullConversationId_callsOnError() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("origMsgId");
+        replyTo.setText("Text gốc");
+
+        repository.sendReplyMessage(null, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockCallback, never()).onSuccess(anyString());
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC67: sendReplyMessage — replyTo null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void sendReplyMessage_nullReplyTo_callsOnError() {
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, null, mockCallback);
+
+        verify(mockCallback).onError("Thông tin tin nhắn gốc không hợp lệ.");
+        verify(mockCallback, never()).onSuccess(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC68: sendReplyMessage — replyTo.messageId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void sendReplyMessage_nullReplyToMessageId_callsOnError() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId(null);
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockCallback).onError("ID tin nhắn gốc không hợp lệ.");
+        verify(mockCallback, never()).onSuccess(anyString());
+    }
+
+    @Test
+    public void sendReplyMessage_emptyReplyToMessageId_callsOnError() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("");
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockCallback).onError("ID tin nhắn gốc không hợp lệ.");
+        verify(mockCallback, never()).onSuccess(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC69: sendReplyMessage — tham số hợp lệ → batch.commit() gọi → onSuccess(messageId)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void sendReplyMessage_validParams_callsCommitAndOnSuccess() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("origMsgId");
+        replyTo.setText("Text gốc");
+        replyTo.setSenderId("senderB");
+        replyTo.setSenderName("User B");
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockBatch).commit();
+        verify(mockCallback).onSuccess(TEST_MESSAGE_ID);
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC70: sendReplyMessage — replyTo.messageId trong msgData khớp message gốc
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void sendReplyMessage_validParams_replyToMessageIdMatchesOriginal() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("origMsgId");
+        replyTo.setText("Text gốc");
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        // Bắt msgData từ batch.set(msgRef, msgData)
+        verify(mockBatch).set(any(DocumentReference.class), mapCaptor.capture());
+        Map<String, Object> msgData = mapCaptor.getValue();
+        Map<String, Object> replyToMap = (Map<String, Object>) msgData.get("replyTo");
+
+        assertNotNull(replyToMap);
+        assertEquals("origMsgId", replyToMap.get("messageId"));
+    }
+
+    // -----------------------------------------------------------------------
+    // TC71: sendReplyMessage — replyTo.text là preview nội dung gốc (non-null)
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void sendReplyMessage_nonNullReplyText_storesOriginalText() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("origMsgId");
+        replyTo.setText("Text gốc");
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockBatch).set(any(DocumentReference.class), mapCaptor.capture());
+        Map<String, Object> msgData = mapCaptor.getValue();
+        Map<String, Object> replyToMap = (Map<String, Object>) msgData.get("replyTo");
+
+        assertNotNull(replyToMap);
+        assertEquals("Text gốc", replyToMap.get("text"));
+    }
+
+    // -----------------------------------------------------------------------
+    // TC72: sendReplyMessage — replyTo.text null (tin đã thu hồi) → "[Tin nhắn đã thu hồi]"
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void sendReplyMessage_nullReplyText_storesRecalledPlaceholder() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("origMsgId");
+        replyTo.setText(null); // Tin gốc đã bị thu hồi, text đã bị xóa
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockBatch).set(any(DocumentReference.class), mapCaptor.capture());
+        Map<String, Object> msgData = mapCaptor.getValue();
+        Map<String, Object> replyToMap = (Map<String, Object>) msgData.get("replyTo");
+
+        assertNotNull(replyToMap);
+        assertEquals("[Tin nhắn đã thu hồi]", replyToMap.get("text"));
+    }
+
+    // -----------------------------------------------------------------------
+    // TC73: sendReplyMessage — hợp lệ nhưng batch.commit() fails → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void sendReplyMessage_commitFails_callsOnError() {
+        ReplyInfo replyTo = new ReplyInfo();
+        replyTo.setMessageId("origMsgId");
+        replyTo.setText("Text gốc");
+
+        Exception exception = new Exception("Commit failed");
+        Task<Void> commitTask = buildVoidFailureTask(exception);
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.sendReplyMessage(CONV_ID, SENDER_ID, SENDER_NAME, MESSAGE_TEXT, replyTo, mockCallback);
+
+        verify(mockCallback).onError("Commit failed");
+        verify(mockCallback, never()).onSuccess(anyString());
     }
 }
