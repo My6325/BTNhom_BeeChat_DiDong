@@ -95,6 +95,10 @@ public class MessageRepositoryTest {
     @Mock
     private MessageRepository.OnMessageStatusCallback mockStatusCallback;
 
+    /** DocumentSnapshot trả về khi fetch message document (recallMessage) */
+    @Mock
+    private DocumentSnapshot mockMsgSnapshot;
+
     @Captor
     private ArgumentCaptor<Map<String, Object>> mapCaptor;
 
@@ -612,5 +616,195 @@ public class MessageRepositoryTest {
             return mockTask;
         }).when(mockTask).addOnFailureListener(any(OnFailureListener.class));
         return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<DocumentSnapshot> thành công
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<DocumentSnapshot> buildDocSnapshotSuccessTask(DocumentSnapshot snapshot) {
+        Task<DocumentSnapshot> mockTask = mock(Task.class);
+        doAnswer(inv -> {
+            ((OnSuccessListener<DocumentSnapshot>) inv.getArgument(0)).onSuccess(snapshot);
+            return mockTask;
+        }).when(mockTask).addOnSuccessListener(any(OnSuccessListener.class));
+        when(mockTask.addOnFailureListener(any(OnFailureListener.class))).thenReturn(mockTask);
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<DocumentSnapshot> thất bại
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<DocumentSnapshot> buildDocSnapshotFailureTask(Exception exception) {
+        Task<DocumentSnapshot> mockTask = mock(Task.class);
+        when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
+        doAnswer(inv -> {
+            ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
+            return mockTask;
+        }).when(mockTask).addOnFailureListener(any(OnFailureListener.class));
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // TC57: recallMessage — conversationId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_nullConversationId_callsOnError() {
+        repository.recallMessage(null, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC58: recallMessage — conversationId rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_emptyConversationId_callsOnError() {
+        repository.recallMessage("", TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC59: recallMessage — messageId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_nullMessageId_callsOnError() {
+        repository.recallMessage(CONV_ID, null, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID tin nhắn không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC60: recallMessage — callerUid null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_nullCallerUid_callsOnError() {
+        repository.recallMessage(CONV_ID, TEST_MESSAGE_ID, null, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC61: recallMessage — document không tồn tại → onError("Tin nhắn không tồn tại.")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_documentNotExists_callsOnError() {
+        when(mockMsgSnapshot.exists()).thenReturn(false);
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMsgSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(getTask);
+
+        repository.recallMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Tin nhắn không tồn tại.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC62: recallMessage — callerUid ≠ senderId → onError("Chỉ người gửi mới được thu hồi")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_wrongSender_callsOnError() {
+        when(mockMsgSnapshot.exists()).thenReturn(true);
+        when(mockMsgSnapshot.getString("senderId")).thenReturn("otherUserId");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMsgSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(getTask);
+
+        repository.recallMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Chỉ người gửi mới được thu hồi tin nhắn.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC63: recallMessage — createdAt > 5 phút → onError("Chỉ có thể thu hồi trong 5 phút đầu.")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_exceeds5Minutes_callsOnError() {
+        // Tạo timestamp 10 phút trước
+        com.google.firebase.Timestamp oldTimestamp = mock(com.google.firebase.Timestamp.class);
+        when(oldTimestamp.toDate()).thenReturn(new java.util.Date(System.currentTimeMillis() - 10 * 60 * 1000L));
+
+        when(mockMsgSnapshot.exists()).thenReturn(true);
+        when(mockMsgSnapshot.getString("senderId")).thenReturn(SENDER_ID);
+        when(mockMsgSnapshot.getTimestamp("createdAt")).thenReturn(oldTimestamp);
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMsgSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(getTask);
+
+        repository.recallMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Chỉ có thể thu hồi trong 5 phút đầu.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC64: recallMessage — hợp lệ (sender đúng, < 5 phút) → update() gọi → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_validParams_callsUpdateAndOnSuccess() {
+        // Tạo timestamp 1 phút trước (còn trong cửa sổ 5 phút)
+        com.google.firebase.Timestamp recentTimestamp = mock(com.google.firebase.Timestamp.class);
+        when(recentTimestamp.toDate()).thenReturn(new java.util.Date(System.currentTimeMillis() - 60 * 1000L));
+
+        when(mockMsgSnapshot.exists()).thenReturn(true);
+        when(mockMsgSnapshot.getString("senderId")).thenReturn(SENDER_ID);
+        when(mockMsgSnapshot.getTimestamp("createdAt")).thenReturn(recentTimestamp);
+        when(mockMsgSnapshot.getReference()).thenReturn(mockSpecificMsgRef);
+
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMsgSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(getTask);
+
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.recallMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockSpecificMsgRef).update(anyMap());
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC65: recallMessage — hợp lệ nhưng Firestore update() fails → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void recallMessage_firestoreUpdateFails_callsOnError() {
+        com.google.firebase.Timestamp recentTimestamp = mock(com.google.firebase.Timestamp.class);
+        when(recentTimestamp.toDate()).thenReturn(new java.util.Date(System.currentTimeMillis() - 60 * 1000L));
+
+        when(mockMsgSnapshot.exists()).thenReturn(true);
+        when(mockMsgSnapshot.getString("senderId")).thenReturn(SENDER_ID);
+        when(mockMsgSnapshot.getTimestamp("createdAt")).thenReturn(recentTimestamp);
+        when(mockMsgSnapshot.getReference()).thenReturn(mockSpecificMsgRef);
+
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMsgSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(getTask);
+
+        Exception exception = new Exception("Firestore update failed");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.recallMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Firestore update failed");
+        verify(mockStatusCallback, never()).onSuccess();
     }
 }

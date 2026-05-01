@@ -190,6 +190,76 @@ public class MessageRepository {
     }
 
     /**
+     * Thu hồi tin nhắn trong vòng 5 phút sau khi gửi.
+     * Chỉ người gửi (senderId) mới được phép thu hồi.
+     * Sau khi thu hồi: isRecalled=true, text và mediaUrl bị xóa khỏi document.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param messageId      ID tin nhắn cần thu hồi (không được rỗng)
+     * @param callerUid      UID người thực hiện thu hồi (phải là senderId)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void recallMessage(String conversationId, String messageId,
+                              String callerUid, OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (messageId == null || messageId.trim().isEmpty()) {
+            callback.onError("ID tin nhắn không hợp lệ.");
+            return;
+        }
+        if (callerUid == null || callerUid.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .document(messageId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        callback.onError("Tin nhắn không tồn tại.");
+                        return;
+                    }
+
+                    String senderId = snapshot.getString("senderId");
+                    if (!callerUid.trim().equals(senderId)) {
+                        callback.onError("Chỉ người gửi mới được thu hồi tin nhắn.");
+                        return;
+                    }
+
+                    com.google.firebase.Timestamp createdAt = snapshot.getTimestamp("createdAt");
+                    if (createdAt == null) {
+                        callback.onError("Không thể xác định thời gian gửi.");
+                        return;
+                    }
+
+                    long ageMs = System.currentTimeMillis() - createdAt.toDate().getTime();
+                    if (ageMs > 5 * 60 * 1000L) {
+                        callback.onError("Chỉ có thể thu hồi trong 5 phút đầu.");
+                        return;
+                    }
+
+                    // Xóa nội dung và đánh dấu thu hồi
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("isRecalled", true);
+                    updates.put("text", FieldValue.delete());
+                    updates.put("mediaUrl", FieldValue.delete());
+                    updates.put("recalledAt", FieldValue.serverTimestamp());
+                    updates.put("updatedAt", FieldValue.serverTimestamp());
+
+                    snapshot.getReference()
+                            .update(updates)
+                            .addOnSuccessListener(unused -> callback.onSuccess())
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                })
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Đánh dấu toàn bộ tin nhắn chưa đọc trong hội thoại là "read".
      * Dùng WriteBatch để cập nhật atomic. Ghi thêm readBy.{userId}=serverTimestamp() cho group chat.
      * Nếu không có tin nhắn nào cần đánh dấu, gọi onSuccess() ngay mà không tạo batch.
