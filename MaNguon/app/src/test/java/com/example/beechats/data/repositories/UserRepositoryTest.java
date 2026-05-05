@@ -20,6 +20,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -196,6 +197,126 @@ public class UserRepositoryTest {
         repository.updateOnlineStatus("uid-001", true, mockCallback);
 
         verify(mockCallback).onError("Network timeout");
+        verify(mockCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC83: updateFcmToken — userId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateFcmToken_nullUserId_callsOnError() {
+        repository.updateFcmToken(null, "token-xyz", mockCallback);
+
+        verify(mockCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC84: updateFcmToken — token null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateFcmToken_nullToken_callsOnError() {
+        repository.updateFcmToken("uid-001", null, mockCallback);
+
+        verify(mockCallback).onError("FCM Token không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    @Test
+    public void updateFcmToken_emptyToken_callsOnError() {
+        repository.updateFcmToken("uid-001", "", mockCallback);
+
+        verify(mockCallback).onError("FCM Token không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC85: updateFcmToken — params hợp lệ → Firestore update("fcmToken",...) → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateFcmToken_validParams_callsFirestoreUpdateAndOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockDocument.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        ArgumentCaptor<String> fieldCaptor = ArgumentCaptor.forClass(String.class);
+
+        repository.updateFcmToken("uid-001", "token-xyz-123", mockCallback);
+
+        verify(mockDocument).update(fieldCaptor.capture(), any(Object.class));
+        assertEquals("fcmToken", fieldCaptor.getValue());
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC86: updateFcmToken — Firestore fails → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void updateFcmToken_firestoreFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockDocument.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        repository.updateFcmToken("uid-001", "token-xyz-123", mockCallback);
+
+        verify(mockCallback).onError("Network error");
+        verify(mockCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC87: clearFcmToken — userId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void clearFcmToken_nullUserId_callsOnError() {
+        repository.clearFcmToken(null, mockCallback);
+
+        verify(mockCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC88: clearFcmToken — userId hợp lệ → update("fcmToken", "") → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void clearFcmToken_validUserId_callsFirestoreUpdateWithEmptyAndOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockDocument.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        ArgumentCaptor<String> fieldCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object> valueCaptor = ArgumentCaptor.forClass(Object.class);
+
+        repository.clearFcmToken("uid-001", mockCallback);
+
+        verify(mockDocument).update(fieldCaptor.capture(), valueCaptor.capture());
+        assertEquals("fcmToken", fieldCaptor.getValue());
+        assertEquals("", valueCaptor.getValue());
+        verify(mockCallback).onSuccess();
+        verify(mockCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC89: clearFcmToken — Firestore fails → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void clearFcmToken_firestoreFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockDocument.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        repository.clearFcmToken("uid-001", mockCallback);
+
+        verify(mockCallback).onError("Network error");
         verify(mockCallback, never()).onSuccess();
     }
 

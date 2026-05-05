@@ -157,6 +157,51 @@ public class UserRepository {
     }
 
     /**
+     * Lưu FCM token vào Firestore để nhận push notification.
+     * Gọi sau khi đăng nhập thành công và khi token được làm mới.
+     *
+     * @param userId   UID của người dùng
+     * @param token    FCM token mới (không được rỗng)
+     * @param callback Kết quả trả về
+     */
+    public void updateFcmToken(String userId, String token, OnCompleteCallback callback) {
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+        if (token == null || token.trim().isEmpty()) {
+            callback.onError("FCM Token không hợp lệ.");
+            return;
+        }
+
+        db.collection(COLLECTION)
+                .document(userId)
+                .update("fcmToken", token.trim())
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Xóa FCM token khỏi Firestore khi đăng xuất.
+     * Đặt fcmToken = "" để thiết bị không còn nhận push notification.
+     *
+     * @param userId   UID của người dùng
+     * @param callback Kết quả trả về
+     */
+    public void clearFcmToken(String userId, OnCompleteCallback callback) {
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        db.collection(COLLECTION)
+                .document(userId)
+                .update("fcmToken", "")
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Xóa document người dùng khỏi Firestore.
      * Gọi trước khi xóa Auth user để tránh mất quyền ghi.
      *
