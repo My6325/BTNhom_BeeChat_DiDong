@@ -344,6 +344,77 @@ public class MessageRepository {
     }
 
     /**
+     * Thêm hoặc ghi đè reaction (emoji) của người dùng vào tin nhắn.
+     * Dùng dot-notation để update nested map field mà không ghi đè toàn bộ map reactions.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param messageId      ID tin nhắn (không được rỗng)
+     * @param userId         UID người react (không được rỗng)
+     * @param emoji          Emoji string (không được rỗng)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void addReaction(String conversationId, String messageId, String userId,
+                            String emoji, OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (messageId == null || messageId.trim().isEmpty()) {
+            callback.onError("ID tin nhắn không hợp lệ.");
+            return;
+        }
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+        if (emoji == null || emoji.trim().isEmpty()) {
+            callback.onError("Emoji không được để trống.");
+            return;
+        }
+
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .document(messageId)
+                .update("reactions." + userId.trim(), emoji.trim())
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Xóa reaction của người dùng khỏi tin nhắn.
+     * Dùng FieldValue.delete() để xóa key userId khỏi map reactions.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param messageId      ID tin nhắn (không được rỗng)
+     * @param userId         UID người muốn xóa reaction (không được rỗng)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void removeReaction(String conversationId, String messageId, String userId,
+                               OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (messageId == null || messageId.trim().isEmpty()) {
+            callback.onError("ID tin nhắn không hợp lệ.");
+            return;
+        }
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection(MSG_SUBCOLLECTION)
+                .document(messageId)
+                .update("reactions." + userId.trim(), FieldValue.delete())
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Đánh dấu toàn bộ tin nhắn chưa đọc trong hội thoại là "read".
      * Dùng WriteBatch để cập nhật atomic. Ghi thêm readBy.{userId}=serverTimestamp() cho group chat.
      * Nếu không có tin nhắn nào cần đánh dấu, gọi onSuccess() ngay mà không tạo batch.

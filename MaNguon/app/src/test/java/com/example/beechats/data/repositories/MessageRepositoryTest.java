@@ -978,4 +978,149 @@ public class MessageRepositoryTest {
         verify(mockCallback).onError("Commit failed");
         verify(mockCallback, never()).onSuccess(anyString());
     }
+
+    // -----------------------------------------------------------------------
+    // TC74: addReaction — conversationId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addReaction_nullConversationId_callsOnError() {
+        repository.addReaction(null, TEST_MESSAGE_ID, SENDER_ID, "❤️", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC75: addReaction — messageId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addReaction_nullMessageId_callsOnError() {
+        repository.addReaction(CONV_ID, null, SENDER_ID, "❤️", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID tin nhắn không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC76: addReaction — userId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addReaction_nullUserId_callsOnError() {
+        repository.addReaction(CONV_ID, TEST_MESSAGE_ID, null, "❤️", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC77: addReaction — emoji null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addReaction_nullEmoji_callsOnError() {
+        repository.addReaction(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, null, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Emoji không được để trống.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    @Test
+    public void addReaction_emptyEmoji_callsOnError() {
+        repository.addReaction(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, "", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Emoji không được để trống.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC78: addReaction — params hợp lệ → update("reactions.aaaa", "❤️") → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addReaction_validParams_callsUpdateAndOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        // Stub update(String field, Object value) — overload khác với update(Map)
+        when(mockSpecificMsgRef.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        ArgumentCaptor<String> fieldCaptor = ArgumentCaptor.forClass(String.class);
+
+        repository.addReaction(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, "❤️", mockStatusCallback);
+
+        verify(mockSpecificMsgRef).update(fieldCaptor.capture(), any(Object.class));
+        assertEquals("reactions." + SENDER_ID, fieldCaptor.getValue());
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC79: addReaction — update thất bại → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addReaction_updateFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockSpecificMsgRef.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        repository.addReaction(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, "❤️", mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Network error");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC80: removeReaction — conversationId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeReaction_nullConversationId_callsOnError() {
+        repository.removeReaction(null, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC81: removeReaction — params hợp lệ → update("reactions.aaaa", FieldValue.delete()) → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeReaction_validParams_callsUpdateWithDeleteAndOnSuccess() {
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockSpecificMsgRef.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        ArgumentCaptor<String> fieldCaptor = ArgumentCaptor.forClass(String.class);
+
+        repository.removeReaction(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockSpecificMsgRef).update(fieldCaptor.capture(), any(Object.class));
+        assertEquals("reactions." + SENDER_ID, fieldCaptor.getValue());
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC82: removeReaction — update thất bại → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeReaction_updateFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockSpecificMsgRef.update(anyString(), any(Object.class))).thenReturn(updateTask);
+
+        repository.removeReaction(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Network error");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
 }
