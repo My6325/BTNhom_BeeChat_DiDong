@@ -4,7 +4,11 @@ import com.example.beechats.data.models.Conversation;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.CollectionReference;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,6 +67,71 @@ public class ConversationRepository {
         db.collection(COLLECTION)
                 .document(conversationId)
                 .set(data, SetOptions.merge())
+                .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Tạo nhóm chat với nhiều thành viên.
+     * Dùng WriteBatch để atomic: tạo conversation document (type="group") + subcollection
+     * members/{userId} cho từng thành viên. Người tạo tự động là admin.
+     *
+     * @param creatorId  UID người tạo nhóm (tự động thêm vào participants nếu chưa có)
+     * @param groupName  Tên nhóm (không được rỗng)
+     * @param memberIds  Danh sách UID thành viên (không được null/rỗng)
+     * @param callback   Kết quả trả về (onSuccess với conversationId, hoặc onError)
+     */
+    public void createGroupConversation(String creatorId, String groupName,
+                                        List<String> memberIds, OnConversationCallback callback) {
+        if (creatorId == null || creatorId.trim().isEmpty()) {
+            callback.onError("ID người tạo không hợp lệ.");
+            return;
+        }
+        if (groupName == null || groupName.trim().isEmpty()) {
+            callback.onError("Tên nhóm không được để trống.");
+            return;
+        }
+        if (memberIds == null || memberIds.isEmpty()) {
+            callback.onError("Danh sách thành viên không hợp lệ.");
+            return;
+        }
+
+        // Đảm bảo creator có trong danh sách participants
+        List<String> participants = new ArrayList<>(memberIds);
+        String trimmedCreatorId = creatorId.trim();
+        if (!participants.contains(trimmedCreatorId)) {
+            participants.add(trimmedCreatorId);
+        }
+
+        // Tạo conversation doc với random ID
+        DocumentReference convRef = db.collection(COLLECTION).document();
+        String conversationId = convRef.getId();
+
+        Map<String, Object> convData = new HashMap<>();
+        convData.put("type", "group");
+        convData.put("groupName", groupName.trim());
+        convData.put("participants", participants);
+        convData.put("participantCount", participants.size());
+        convData.put("adminIds", Collections.singletonList(trimmedCreatorId));
+        convData.put("createdBy", trimmedCreatorId);
+        convData.put("createdAt", FieldValue.serverTimestamp());
+        convData.put("updatedAt", FieldValue.serverTimestamp());
+
+        WriteBatch batch = db.batch();
+        batch.set(convRef, convData);
+
+        // Tạo member document trong subcollection members/ cho từng thành viên
+        CollectionReference membersRef = convRef.collection("members");
+        for (String memberId : participants) {
+            DocumentReference memberRef = membersRef.document(memberId);
+            Map<String, Object> memberData = new HashMap<>();
+            memberData.put("memberId", memberId);
+            memberData.put("role", memberId.equals(trimmedCreatorId) ? "admin" : "member");
+            memberData.put("joinedAt", FieldValue.serverTimestamp());
+            batch.set(memberRef, memberData);
+        }
+
+        batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
