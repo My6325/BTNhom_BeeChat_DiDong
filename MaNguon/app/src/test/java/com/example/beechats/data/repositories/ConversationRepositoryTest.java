@@ -22,6 +22,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 
+import com.google.firebase.firestore.DocumentSnapshot;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -57,8 +59,15 @@ public class ConversationRepositoryTest {
     @Mock
     private DocumentReference mockMemberRef;
 
+    // Mock cho removeMember (role check via DocumentSnapshot)
+    @Mock
+    private DocumentSnapshot mockMemberSnapshot;
+
     @Mock
     private ConversationRepository.OnConversationCallback mockCallback;
+
+    @Mock
+    private ConversationRepository.OnCompleteCallback mockCompleteCallback;
 
     private ConversationRepository repository;
 
@@ -78,6 +87,8 @@ public class ConversationRepositoryTest {
         // Stub WriteBatch
         when(mockFirestore.batch()).thenReturn(mockBatch);
         when(mockBatch.set(any(DocumentReference.class), anyMap())).thenReturn(mockBatch);
+        when(mockBatch.update(any(DocumentReference.class), anyMap())).thenReturn(mockBatch);
+        when(mockBatch.delete(any(DocumentReference.class))).thenReturn(mockBatch);
         repository = new ConversationRepository(mockFirestore);
     }
 
@@ -409,5 +420,236 @@ public class ConversationRepositoryTest {
 
         verify(mockCallback).onError("Batch commit error");
         verify(mockCallback, never()).onSuccess(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC100: addMember — convId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addMember_nullConvId_callsOnError() {
+        repository.addMember(null, "uid2", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC101: addMember — userId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addMember_nullUserId_callsOnError() {
+        repository.addMember("conv1", null, mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID thành viên không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    @Test
+    public void addMember_emptyUserId_callsOnError() {
+        repository.addMember("conv1", "  ", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID thành viên không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC102: addMember — happy path → batch.update + batch.set + onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addMember_validInputs_batchUpdateAndSetAndOnSuccess() {
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.addMember("conv1", "uid2", mockCompleteCallback);
+
+        verify(mockBatch).update(eq(mockDocument), anyMap());
+        verify(mockBatch).set(eq(mockMemberRef), anyMap());
+        verify(mockBatch).commit();
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC103: addMember — batch fail → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void addMember_batchFails_callsOnError() {
+        Exception exception = new Exception("Add member error");
+        Task<Void> failTask = buildVoidFailureTask(exception);
+        when(mockBatch.commit()).thenReturn(failTask);
+
+        repository.addMember("conv1", "uid2", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Add member error");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC104: removeMember — convId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_nullConvId_callsOnError() {
+        repository.removeMember(null, "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).get();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC105: removeMember — userId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_nullUserId_callsOnError() {
+        repository.removeMember("conv1", null, "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID thành viên không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC106: removeMember — requesterId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_nullRequesterId_callsOnError() {
+        repository.removeMember("conv1", "uid2", null, mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID người yêu cầu không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).get();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC107: removeMember — requester không phải thành viên (snapshot không tồn tại)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_requesterNotMember_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(false);
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        repository.removeMember("conv1", "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Người yêu cầu không phải thành viên nhóm.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC108: removeMember — requester là member (không phải admin) → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_requesterNotAdmin_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("member");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        repository.removeMember("conv1", "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Chỉ admin mới có thể xóa thành viên.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC109: removeMember — requester là admin → batch.update + batch.delete + onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_requesterIsAdmin_batchUpdateDeleteAndOnSuccess() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.removeMember("conv1", "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockBatch).update(eq(mockDocument), anyMap());
+        verify(mockBatch).delete(eq(mockMemberRef));
+        verify(mockBatch).commit();
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC110: removeMember — get() Firestore fail → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_getRequesterFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotFailureTask(exception);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        repository.removeMember("conv1", "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Network error");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC111: removeMember — requester admin nhưng batch fail → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void removeMember_adminBatchFails_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        Exception exception = new Exception("Batch commit error");
+        Task<Void> failTask = buildVoidFailureTask(exception);
+        when(mockBatch.commit()).thenReturn(failTask);
+
+        repository.removeMember("conv1", "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Batch commit error");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<DocumentSnapshot> thành công
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<DocumentSnapshot> buildDocSnapshotSuccessTask(DocumentSnapshot snapshot) {
+        Task<DocumentSnapshot> mockTask = mock(Task.class);
+        doAnswer(inv -> {
+            ((OnSuccessListener<DocumentSnapshot>) inv.getArgument(0)).onSuccess(snapshot);
+            return mockTask;
+        }).when(mockTask).addOnSuccessListener(any(OnSuccessListener.class));
+        when(mockTask.addOnFailureListener(any(OnFailureListener.class))).thenReturn(mockTask);
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<DocumentSnapshot> thất bại
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<DocumentSnapshot> buildDocSnapshotFailureTask(Exception exception) {
+        Task<DocumentSnapshot> mockTask = mock(Task.class);
+        when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
+        doAnswer(inv -> {
+            ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
+            return mockTask;
+        }).when(mockTask).addOnFailureListener(any(OnFailureListener.class));
+        return mockTask;
     }
 }

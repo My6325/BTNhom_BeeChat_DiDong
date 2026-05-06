@@ -27,6 +27,11 @@ public class ConversationRepository {
         void onError(String errorMessage);
     }
 
+    public interface OnCompleteCallback {
+        void onSuccess();
+        void onError(String errorMessage);
+    }
+
     private final FirebaseFirestore db;
     private static final String COLLECTION = "conversations";
 
@@ -134,6 +139,112 @@ public class ConversationRepository {
         batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Thêm thành viên vào nhóm chat.
+     * Dùng WriteBatch để atomic: cập nhật participants (arrayUnion) + participantCount +
+     * tạo member document trong subcollection members/.
+     *
+     * @param convId   ID hội thoại nhóm
+     * @param userId   UID thành viên cần thêm
+     * @param callback Kết quả trả về
+     */
+    public void addMember(String convId, String userId, OnCompleteCallback callback) {
+        if (convId == null || convId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID thành viên không hợp lệ.");
+            return;
+        }
+
+        String trimmedConvId = convId.trim();
+        String trimmedUserId = userId.trim();
+
+        DocumentReference convRef = db.collection(COLLECTION).document(trimmedConvId);
+        DocumentReference memberRef = convRef.collection("members").document(trimmedUserId);
+
+        Map<String, Object> convUpdate = new HashMap<>();
+        convUpdate.put("participants", FieldValue.arrayUnion(trimmedUserId));
+        convUpdate.put("participantCount", FieldValue.increment(1));
+        convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+
+        Map<String, Object> memberData = new HashMap<>();
+        memberData.put("memberId", trimmedUserId);
+        memberData.put("role", "member");
+        memberData.put("joinedAt", FieldValue.serverTimestamp());
+
+        WriteBatch batch = db.batch();
+        batch.update(convRef, convUpdate);
+        batch.set(memberRef, memberData);
+
+        batch.commit()
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Xóa thành viên khỏi nhóm chat. Chỉ admin mới có quyền.
+     * Đọc role của requesterId trước, sau đó dùng WriteBatch atomic: arrayRemove + delete member doc.
+     *
+     * @param convId      ID hội thoại nhóm
+     * @param userId      UID thành viên cần xóa
+     * @param requesterId UID người yêu cầu (phải là admin)
+     * @param callback    Kết quả trả về
+     */
+    public void removeMember(String convId, String userId, String requesterId,
+                             OnCompleteCallback callback) {
+        if (convId == null || convId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID thành viên không hợp lệ.");
+            return;
+        }
+        if (requesterId == null || requesterId.trim().isEmpty()) {
+            callback.onError("ID người yêu cầu không hợp lệ.");
+            return;
+        }
+
+        String trimmedConvId = convId.trim();
+        String trimmedUserId = userId.trim();
+        String trimmedRequesterId = requesterId.trim();
+
+        DocumentReference convRef = db.collection(COLLECTION).document(trimmedConvId);
+        DocumentReference requesterRef = convRef.collection("members").document(trimmedRequesterId);
+
+        // Kiểm tra quyền admin của requester trước khi thực hiện
+        requesterRef.get()
+                .addOnFailureListener(e -> callback.onError(e.getMessage()))
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        callback.onError("Người yêu cầu không phải thành viên nhóm.");
+                        return;
+                    }
+                    String role = snapshot.getString("role");
+                    if (!"admin".equals(role)) {
+                        callback.onError("Chỉ admin mới có thể xóa thành viên.");
+                        return;
+                    }
+
+                    DocumentReference memberRef = convRef.collection("members").document(trimmedUserId);
+
+                    Map<String, Object> convUpdate = new HashMap<>();
+                    convUpdate.put("participants", FieldValue.arrayRemove(trimmedUserId));
+                    convUpdate.put("participantCount", FieldValue.increment(-1));
+                    convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+
+                    WriteBatch batch = db.batch();
+                    batch.update(convRef, convUpdate);
+                    batch.delete(memberRef);
+
+                    batch.commit()
+                            .addOnSuccessListener(unused -> callback.onSuccess())
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                });
     }
 
     /**
