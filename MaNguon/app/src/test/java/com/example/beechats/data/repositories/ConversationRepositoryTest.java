@@ -59,9 +59,13 @@ public class ConversationRepositoryTest {
     @Mock
     private DocumentReference mockMemberRef;
 
-    // Mock cho removeMember (role check via DocumentSnapshot)
+    // Mock cho removeMember / setMemberRole (role check via DocumentSnapshot)
     @Mock
     private DocumentSnapshot mockMemberSnapshot;
+
+    // Mock cho setMemberRole (kiểm tra adminIds trong conversation doc)
+    @Mock
+    private DocumentSnapshot mockConvSnapshot;
 
     @Mock
     private ConversationRepository.OnConversationCallback mockCallback;
@@ -618,6 +622,240 @@ public class ConversationRepositoryTest {
         when(mockBatch.commit()).thenReturn(failTask);
 
         repository.removeMember("conv1", "uid2", "uid1", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Batch commit error");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC112: setMemberRole — convId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_nullConvId_callsOnError() {
+        repository.setMemberRole(null, "uid2", "uid1", "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).get();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC113: setMemberRole — memberId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_nullMemberId_callsOnError() {
+        repository.setMemberRole("conv1", null, "uid1", "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID thành viên không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    @Test
+    public void setMemberRole_emptyMemberId_callsOnError() {
+        repository.setMemberRole("conv1", "  ", "uid1", "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID thành viên không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC114: setMemberRole — requesterId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_nullRequesterId_callsOnError() {
+        repository.setMemberRole("conv1", "uid2", null, "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID người yêu cầu không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).get();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC115: setMemberRole — role không hợp lệ → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_invalidRole_callsOnError() {
+        repository.setMemberRole("conv1", "uid2", "uid1", "superadmin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError(
+                "Vai trò không hợp lệ. Chỉ chấp nhận \"admin\" hoặc \"member\".");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).get();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC116: setMemberRole — requester không phải thành viên (snapshot không tồn tại)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_requesterNotMember_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(false);
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Người yêu cầu không phải thành viên nhóm.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC117: setMemberRole — requester là member (không phải admin) → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_requesterNotAdmin_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("member");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Chỉ admin mới có thể thay đổi vai trò thành viên.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC118: setMemberRole — thăng lên admin → batch.update x2 + arrayUnion + onSuccess()
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_promoteToAdmin_batchUpdatesAndOnSuccess() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> getTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(getTask);
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "admin", mockCompleteCallback);
+
+        // Không cần đọc conv doc khi promote
+        verify(mockDocument, never()).get();
+        verify(mockBatch, times(2)).update(any(DocumentReference.class), anyMap());
+        verify(mockBatch).commit();
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC119: setMemberRole — hạ xuống member, không phải admin cuối → onSuccess()
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void setMemberRole_demoteToMember_notLastAdmin_batchUpdatesAndOnSuccess() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(memberGetTask);
+
+        // Conv doc có 2 admin → không phải admin cuối
+        when(mockConvSnapshot.get("adminIds")).thenReturn(Arrays.asList("uid1", "uid2"));
+        Task<DocumentSnapshot> convGetTask = buildDocSnapshotSuccessTask(mockConvSnapshot);
+        when(mockDocument.get()).thenReturn(convGetTask);
+
+        Task<Void> commitTask = buildVoidSuccessTask();
+        when(mockBatch.commit()).thenReturn(commitTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "member", mockCompleteCallback);
+
+        verify(mockDocument).get();
+        verify(mockBatch, times(2)).update(any(DocumentReference.class), anyMap());
+        verify(mockBatch).commit();
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC120: setMemberRole — hạ cấp admin cuối → onError (không thể hạ)
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void setMemberRole_demoteLastAdmin_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(memberGetTask);
+
+        // Conv doc chỉ có 1 admin = memberId đang bị hạ
+        when(mockConvSnapshot.get("adminIds")).thenReturn(java.util.Collections.singletonList("uid1"));
+        Task<DocumentSnapshot> convGetTask = buildDocSnapshotSuccessTask(mockConvSnapshot);
+        when(mockDocument.get()).thenReturn(convGetTask);
+
+        repository.setMemberRole("conv1", "uid1", "uid1", "member", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError(
+                "Không thể hạ cấp admin cuối cùng. Hãy chỉ định admin khác trước.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC121: setMemberRole — requester.get() Firestore fail → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_getRequesterFails_callsOnError() {
+        Exception exception = new Exception("Firestore network error");
+        Task<DocumentSnapshot> failTask = buildDocSnapshotFailureTask(exception);
+        when(mockMemberRef.get()).thenReturn(failTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "admin", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Firestore network error");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC122: setMemberRole — convRef.get() fail khi kiểm tra admin cuối → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setMemberRole_getConvDocFails_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(memberGetTask);
+
+        Exception exception = new Exception("Conv fetch error");
+        Task<DocumentSnapshot> convFailTask = buildDocSnapshotFailureTask(exception);
+        when(mockDocument.get()).thenReturn(convFailTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "member", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Conv fetch error");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockFirestore, never()).batch();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC123: setMemberRole — batch commit fail → onError
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void setMemberRole_batchCommitFails_callsOnError() {
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockMemberRef.get()).thenReturn(memberGetTask);
+
+        Exception exception = new Exception("Batch commit error");
+        Task<Void> failTask = buildVoidFailureTask(exception);
+        when(mockBatch.commit()).thenReturn(failTask);
+
+        repository.setMemberRole("conv1", "uid2", "uid1", "admin", mockCompleteCallback);
 
         verify(mockCompleteCallback).onError("Batch commit error");
         verify(mockCompleteCallback, never()).onSuccess();

@@ -248,6 +248,100 @@ public class ConversationRepository {
     }
 
     /**
+     * Thay đổi vai trò của thành viên trong nhóm chat.
+     * Chỉ admin mới có thể thay đổi. Admin cuối cùng không thể bị hạ cấp.
+     * Khi thăng: WriteBatch update members/{memberId}.role + arrayUnion(adminIds).
+     * Khi hạ: kiểm tra adminIds.size() > 1 trước, sau đó WriteBatch + arrayRemove(adminIds).
+     *
+     * @param convId      ID hội thoại nhóm
+     * @param memberId    UID thành viên cần thay đổi role
+     * @param requesterId UID người yêu cầu (phải là admin)
+     * @param newRole     Vai trò mới ("admin" hoặc "member")
+     * @param callback    Kết quả trả về
+     */
+    public void setMemberRole(String convId, String memberId, String requesterId,
+                              String newRole, OnCompleteCallback callback) {
+        if (convId == null || convId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (memberId == null || memberId.trim().isEmpty()) {
+            callback.onError("ID thành viên không hợp lệ.");
+            return;
+        }
+        if (requesterId == null || requesterId.trim().isEmpty()) {
+            callback.onError("ID người yêu cầu không hợp lệ.");
+            return;
+        }
+        if (!"admin".equals(newRole) && !"member".equals(newRole)) {
+            callback.onError("Vai trò không hợp lệ. Chỉ chấp nhận \"admin\" hoặc \"member\".");
+            return;
+        }
+
+        String trimmedConvId = convId.trim();
+        String trimmedMemberId = memberId.trim();
+        String trimmedRequesterId = requesterId.trim();
+
+        DocumentReference convRef = db.collection(COLLECTION).document(trimmedConvId);
+        DocumentReference requesterRef = convRef.collection("members").document(trimmedRequesterId);
+        DocumentReference memberRef = convRef.collection("members").document(trimmedMemberId);
+
+        // Kiểm tra quyền admin của requester trước khi thực hiện
+        requesterRef.get()
+                .addOnFailureListener(e -> callback.onError(e.getMessage()))
+                .addOnSuccessListener(requesterSnap -> {
+                    if (!requesterSnap.exists()) {
+                        callback.onError("Người yêu cầu không phải thành viên nhóm.");
+                        return;
+                    }
+                    if (!"admin".equals(requesterSnap.getString("role"))) {
+                        callback.onError("Chỉ admin mới có thể thay đổi vai trò thành viên.");
+                        return;
+                    }
+
+                    if ("member".equals(newRole)) {
+                        // Cần kiểm tra không được hạ cấp admin cuối cùng
+                        convRef.get()
+                                .addOnFailureListener(e -> callback.onError(e.getMessage()))
+                                .addOnSuccessListener(convSnap -> {
+                                    @SuppressWarnings("unchecked")
+                                    List<String> adminIds = (List<String>) convSnap.get("adminIds");
+                                    if (adminIds != null && adminIds.size() == 1
+                                            && adminIds.contains(trimmedMemberId)) {
+                                        callback.onError("Không thể hạ cấp admin cuối cùng. Hãy chỉ định admin khác trước.");
+                                        return;
+                                    }
+                                    doSetRoleBatch(convRef, memberRef, trimmedMemberId, newRole, callback);
+                                });
+                    } else {
+                        // Thăng lên admin — không cần kiểm tra thêm
+                        doSetRoleBatch(convRef, memberRef, trimmedMemberId, newRole, callback);
+                    }
+                });
+    }
+
+    /** Thực hiện WriteBatch cập nhật role thành viên + adminIds trong conversation. */
+    private void doSetRoleBatch(DocumentReference convRef, DocumentReference memberRef,
+                                String memberId, String newRole, OnCompleteCallback callback) {
+        Map<String, Object> memberUpdate = new HashMap<>();
+        memberUpdate.put("role", newRole);
+
+        Map<String, Object> convUpdate = new HashMap<>();
+        convUpdate.put("adminIds", "admin".equals(newRole)
+                ? FieldValue.arrayUnion(memberId)
+                : FieldValue.arrayRemove(memberId));
+        convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+
+        WriteBatch batch = db.batch();
+        batch.update(memberRef, memberUpdate);
+        batch.update(convRef, convUpdate);
+
+        batch.commit()
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Lấy thông tin hội thoại từ Firestore.
      *
      * @param conversationId ID hội thoại cần lấy
