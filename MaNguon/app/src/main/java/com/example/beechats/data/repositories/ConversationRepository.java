@@ -342,6 +342,47 @@ public class ConversationRepository {
     }
 
     /**
+     * Đặt hoặc xóa biệt danh (nickname) của một thành viên trong nhóm.
+     * Nếu nickname là null hoặc chuỗi trống → xóa field nickname (dùng FieldValue.delete()).
+     * Chỉ cập nhật members/{memberId}.nickname, không kiểm tra quyền admin ở đây
+     * (UI layer chịu trách nhiệm kiểm tra quyền trước khi gọi).
+     *
+     * @param convId     ID hội thoại nhóm
+     * @param memberId   UID thành viên cần đặt nickname
+     * @param nickname   Biệt danh mới; null hoặc blank để xóa nickname
+     * @param callback   Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void setNickname(String convId, String memberId, String nickname,
+                            OnCompleteCallback callback) {
+        if (convId == null || convId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (memberId == null || memberId.trim().isEmpty()) {
+            callback.onError("ID thành viên không hợp lệ.");
+            return;
+        }
+
+        DocumentReference memberRef = db.collection(COLLECTION)
+                .document(convId.trim())
+                .collection("members")
+                .document(memberId.trim());
+
+        Map<String, Object> update = new HashMap<>();
+        // Nickname null hoặc blank → xóa field để hiển thị về displayName mặc định
+        if (nickname == null || nickname.trim().isEmpty()) {
+            update.put("nickname", FieldValue.delete());
+        } else {
+            update.put("nickname", nickname.trim());
+        }
+        update.put("updatedAt", FieldValue.serverTimestamp());
+
+        memberRef.update(update)
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Lấy thông tin hội thoại từ Firestore.
      *
      * @param conversationId ID hội thoại cần lấy

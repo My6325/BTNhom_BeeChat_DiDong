@@ -93,6 +93,9 @@ public class ConversationRepositoryTest {
         when(mockBatch.set(any(DocumentReference.class), anyMap())).thenReturn(mockBatch);
         when(mockBatch.update(any(DocumentReference.class), anyMap())).thenReturn(mockBatch);
         when(mockBatch.delete(any(DocumentReference.class))).thenReturn(mockBatch);
+        // Stub memberRef.update() dùng cho setNickname (default success)
+        Task<Void> defaultMemberUpdateTask = buildVoidSuccessTask();
+        when(mockMemberRef.update(anyMap())).thenReturn(defaultMemberUpdateTask);
         repository = new ConversationRepository(mockFirestore);
     }
 
@@ -858,6 +861,106 @@ public class ConversationRepositoryTest {
         repository.setMemberRole("conv1", "uid2", "uid1", "admin", mockCompleteCallback);
 
         verify(mockCompleteCallback).onError("Batch commit error");
+        verify(mockCompleteCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC137: setNickname — convId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setNickname_convIdNull_callsOnError() {
+        repository.setNickname(null, "uid1", "Tèo", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).update(anyMap());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC138: setNickname — memberId null/rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setNickname_memberIdBlank_callsOnError() {
+        repository.setNickname("conv1", "   ", "Tèo", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("ID thành viên không hợp lệ.");
+        verify(mockCompleteCallback, never()).onSuccess();
+        verify(mockMemberRef, never()).update(anyMap());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC139: setNickname — nickname hợp lệ → update() với nickname="Tèo" + onSuccess
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void setNickname_validNickname_updatesFieldAndCallsOnSuccess() {
+        repository.setNickname("conv1", "uid1", "Tèo", mockCompleteCallback);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(mockMemberRef).update(captor.capture());
+        Map<String, Object> updateMap = captor.getValue();
+        assertTrue("Phải chứa key nickname", updateMap.containsKey("nickname"));
+        assertTrue("Nickname phải là chuỗi 'Tèo'", "Tèo".equals(updateMap.get("nickname")));
+        assertTrue("Phải chứa key updatedAt", updateMap.containsKey("updatedAt"));
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC140: setNickname — nickname null → update() với FieldValue.delete() + onSuccess
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void setNickname_nicknameNull_deletesFieldAndCallsOnSuccess() {
+        repository.setNickname("conv1", "uid1", null, mockCompleteCallback);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(mockMemberRef).update(captor.capture());
+        Map<String, Object> updateMap = captor.getValue();
+        // Khi xóa nickname, value phải là FieldValue (FieldValue.delete())
+        assertTrue("Phải chứa key nickname để xóa", updateMap.containsKey("nickname"));
+        assertTrue("Value phải là FieldValue (delete sentinel)",
+                updateMap.get("nickname") instanceof com.google.firebase.firestore.FieldValue);
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC141: setNickname — nickname blank → update() với FieldValue.delete() + onSuccess
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void setNickname_nicknameBlank_deletesFieldAndCallsOnSuccess() {
+        repository.setNickname("conv1", "uid1", "   ", mockCompleteCallback);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(mockMemberRef).update(captor.capture());
+        Map<String, Object> updateMap = captor.getValue();
+        assertTrue("Phải chứa key nickname để xóa", updateMap.containsKey("nickname"));
+        assertTrue("Value phải là FieldValue (delete sentinel)",
+                updateMap.get("nickname") instanceof com.google.firebase.firestore.FieldValue);
+        verify(mockCompleteCallback).onSuccess();
+        verify(mockCompleteCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC142: setNickname — Firestore update fail → onError
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void setNickname_firestoreUpdateFails_callsOnError() {
+        Exception exception = new Exception("Network error");
+        Task<Void> failTask = buildVoidFailureTask(exception);
+        when(mockMemberRef.update(anyMap())).thenReturn(failTask);
+
+        repository.setNickname("conv1", "uid1", "Tèo", mockCompleteCallback);
+
+        verify(mockCompleteCallback).onError("Network error");
         verify(mockCompleteCallback, never()).onSuccess();
     }
 
