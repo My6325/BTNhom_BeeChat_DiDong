@@ -2,6 +2,7 @@ package com.example.beechats.data.repositories;
 
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.models.UserSettings;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -22,6 +23,12 @@ public class UserRepository {
 
     public interface OnCompleteCallback {
         void onSuccess();
+
+        void onError(String errorMessage);
+    }
+
+    public interface OnUserListCallback {
+        void onSuccess(List<User> users);
 
         void onError(String errorMessage);
     }
@@ -213,6 +220,40 @@ public class UserRepository {
                 .document(userId)
                 .delete()
                 .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Tìm kiếm người dùng theo keyword dùng mảng searchKeywords.
+     * Loại chính người dùng hiện tại khỏi kết quả.
+     *
+     * @param keyword       Từ khóa tìm kiếm (không được rỗng)
+     * @param currentUserId UID của người dùng đang tìm (để loại khỏi kết quả)
+     * @param callback      Kết quả trả về (onSuccess với List<User>, hoặc onError)
+     */
+    public void searchUsers(String keyword, String currentUserId, OnUserListCallback callback) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            callback.onError("Từ khóa tìm kiếm không được để trống.");
+            return;
+        }
+        if (currentUserId == null || currentUserId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        db.collection(COLLECTION)
+                .whereArrayContains("searchKeywords", keyword.trim().toLowerCase())
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<User> results = new ArrayList<>();
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        User user = doc.toObject(User.class);
+                        if (user != null && !currentUserId.equals(user.getUserId())) {
+                            results.add(user);
+                        }
+                    }
+                    callback.onSuccess(results);
+                })
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 

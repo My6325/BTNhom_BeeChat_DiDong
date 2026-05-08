@@ -3,17 +3,142 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 5, 5);
+    // ----------------------------------------------------------------
+    // Helper functions
+    // ----------------------------------------------------------------
+
+    /** Người dùng đã đăng nhập */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /** Người dùng là chủ sở hữu của document (theo userId) */
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    /** Kiểm tra người dùng có trong danh sách participants của conversation */
+    function isParticipant(convId) {
+      return isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+    }
+
+    /** Kiểm tra người dùng có trong danh sách adminIds của conversation */
+    function isAdmin(convId) {
+      return isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.adminIds;
+    }
+
+    // ----------------------------------------------------------------
+    // Collection: users/{userId}
+    // ----------------------------------------------------------------
+    // - Authenticated users có thể đọc bất kỳ profile nào (tìm kiếm bạn bè)
+    // - Chỉ owner mới được tạo/sửa/xóa document của mình
+    // ----------------------------------------------------------------
+    match /users/{userId} {
+      allow read:   if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // ----------------------------------------------------------------
+    // Collection: conversations/{convId}
+    // ----------------------------------------------------------------
+    // - Chỉ participants mới đọc/sửa conversation
+    // - Tạo mới: user phải tự thêm mình vào participants
+    // - Xóa conversation: chỉ admin (group) hoặc participant (private)
+    // ----------------------------------------------------------------
+    match /conversations/{convId} {
+      allow read:   if isParticipant(convId);
+      allow create: if isAuthenticated() &&
+                       request.auth.uid in request.resource.data.participants;
+      allow update: if isParticipant(convId);
+      allow delete: if isAdmin(convId);
+
+      // --------------------------------------------------------------
+      // Subcollection: messages/{msgId}
+      // --------------------------------------------------------------
+      // - Chỉ participants đọc/tạo/sửa (reactions, readBy, status)
+      // - Xóa: chỉ người gửi (senderId)
+      // --------------------------------------------------------------
+      match /messages/{msgId} {
+        allow read:   if isParticipant(convId);
+        allow create: if isParticipant(convId) &&
+                         request.resource.data.senderId == request.auth.uid;
+        allow update: if isParticipant(convId);
+        allow delete: if isAuthenticated() &&
+                         resource.data.senderId == request.auth.uid;
+      }
+
+      // --------------------------------------------------------------
+      // Subcollection: members/{memberId}
+      // --------------------------------------------------------------
+      // - Participants đọc danh sách thành viên
+      // - Tạo: admin thêm người hoặc user tự join (memberId == uid)
+      // - Update role: chỉ admin
+      // - Xóa: admin kick hoặc member tự rời nhóm
+      // --------------------------------------------------------------
+      match /members/{memberId} {
+        allow read:   if isParticipant(convId);
+        allow create: if isAdmin(convId) || isOwner(memberId);
+        allow update: if isAdmin(convId);
+        allow delete: if isAdmin(convId) || isOwner(memberId);
+      }
+
+      // --------------------------------------------------------------
+      // Subcollection: typingIndicators/{userId}
+      // --------------------------------------------------------------
+      // - Participants đọc trạng thái đang gõ
+      // - Chỉ owner ghi indicator của mình
+      // --------------------------------------------------------------
+      match /typingIndicators/{userId} {
+        allow read:  if isParticipant(convId);
+        allow write: if isOwner(userId) && isParticipant(convId);
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // Collection: friendRequests/{requestId}
+    // ----------------------------------------------------------------
+    // - Chỉ sender hoặc receiver đọc request của mình
+    // - Chỉ sender tạo request (senderId phải là uid của mình)
+    // - Chỉ receiver update (chấp nhận/từ chối)
+    // - Sender hoặc receiver có thể xóa (hủy/từ chối)
+    // ----------------------------------------------------------------
+    match /friendRequests/{requestId} {
+      allow read:   if isAuthenticated() &&
+                       (request.auth.uid == resource.data.senderId ||
+                        request.auth.uid == resource.data.receiverId);
+      allow create: if isAuthenticated() &&
+                       request.auth.uid == request.resource.data.senderId;
+      allow update: if isAuthenticated() &&
+                       request.auth.uid == resource.data.receiverId;
+      allow delete: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.senderId ||
+                        request.auth.uid == resource.data.receiverId);
+    }
+
+    // ----------------------------------------------------------------
+    // Collection: friends/{userId}/friendList/{friendId}
+    // ----------------------------------------------------------------
+    // - Chỉ owner đọc danh sách bạn của mình
+    // - Write: isOwner(userId) OR isOwner(friendId) để hỗ trợ WriteBatch
+    //   kép khi chấp nhận kết bạn (User A ghi cả 2 chiều)
+    // ----------------------------------------------------------------
+    match /friends/{userId}/friendList/{friendId} {
+      allow read:   if isOwner(userId);
+      allow write:  if isOwner(userId) || isOwner(friendId);
+    }
+
+    // ----------------------------------------------------------------
+    // Collection: blockedUsers/{userId}/blockedList/{targetId}
+    // ----------------------------------------------------------------
+    // - Chỉ owner đọc/ghi danh sách block của mình
+    // ----------------------------------------------------------------
+    match /blockedUsers/{userId}/blockedList/{targetId} {
+      allow read:  if isOwner(userId);
+      allow write: if isOwner(userId);
     }
   }
 }
