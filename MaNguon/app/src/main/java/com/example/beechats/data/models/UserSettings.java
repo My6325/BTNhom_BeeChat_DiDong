@@ -4,11 +4,14 @@ public class UserSettings {
     private boolean isOnlineVisible;
     private boolean darkMode;
     private boolean notificationsEnabled;
+    /** Khi false → không ghi readBy khi đọc tin nhắn (ẩn trạng thái đã xem). */
+    private boolean isReadReceiptVisible;
 
     public UserSettings() {
         this.isOnlineVisible = true;
         this.darkMode = false;
         this.notificationsEnabled = true;
+        this.isReadReceiptVisible = true;
     }
 
     public boolean isOnlineVisible() {
@@ -33,5 +36,13 @@ public class UserSettings {
 
     public void setNotificationsEnabled(boolean notificationsEnabled) {
         this.notificationsEnabled = notificationsEnabled;
+    }
+
+    public boolean isReadReceiptVisible() {
+        return isReadReceiptVisible;
+    }
+
+    public void setReadReceiptVisible(boolean readReceiptVisible) {
+        isReadReceiptVisible = readReceiptVisible;
     }
 }
