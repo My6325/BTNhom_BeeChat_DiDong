@@ -11,12 +11,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.beechats.data.models.User;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -24,6 +28,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -42,7 +48,16 @@ public class UserRepositoryTest {
     private DocumentReference mockDocument;
 
     @Mock
+    private Query mockQuery;
+
+    @Mock
+    private QuerySnapshot mockQuerySnapshot;
+
+    @Mock
     private UserRepository.OnCompleteCallback mockCallback;
+
+    @Mock
+    private UserRepository.OnUserListCallback mockUserListCallback;
 
     private UserRepository repository;
 
@@ -52,6 +67,8 @@ public class UserRepositoryTest {
         // Stub Firestore chain: db.collection(...).document(...) → mockDocument
         when(mockFirestore.collection(anyString())).thenReturn(mockCollection);
         when(mockCollection.document(anyString())).thenReturn(mockDocument);
+        // Stub whereArrayContains → mockQuery (dùng cho searchUsers)
+        when(mockCollection.whereArrayContains(anyString(), any())).thenReturn(mockQuery);
         repository = new UserRepository(mockFirestore);
     }
 
@@ -321,6 +338,129 @@ public class UserRepositoryTest {
     }
 
     // -----------------------------------------------------------------------
+    // TC168: searchUsers — keyword hợp lệ → query Firestore → onSuccess với list user
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_validKeyword_callsFirestoreAndReturnsMatchingUsers() {
+        User matchedUser = new User();
+        matchedUser.setUserId("uid-002");
+        matchedUser.setDisplayName("Nguyen Van B");
+
+        DocumentSnapshot mockDoc = mock(DocumentSnapshot.class);
+        when(mockDoc.toObject(User.class)).thenReturn(matchedUser);
+        when(mockQuerySnapshot.getDocuments()).thenReturn(Collections.singletonList(mockDoc));
+
+        Task<QuerySnapshot> queryTask = buildQuerySuccessTask(mockQuerySnapshot);
+        when(mockQuery.get()).thenReturn(queryTask);
+
+        repository.searchUsers("nguyen", "uid-001", mockUserListCallback);
+
+        verify(mockCollection).whereArrayContains("searchKeywords", "nguyen");
+        verify(mockQuery).get();
+
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(mockUserListCallback).onSuccess(captor.capture());
+        assertEquals(1, captor.getValue().size());
+        verify(mockUserListCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC169: searchUsers — kết quả chứa chính mình → bị lọc ra
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_resultContainsCurrentUser_filteredOut() {
+        User self = new User();
+        self.setUserId("uid-001");
+
+        DocumentSnapshot mockDoc = mock(DocumentSnapshot.class);
+        when(mockDoc.toObject(User.class)).thenReturn(self);
+        when(mockQuerySnapshot.getDocuments()).thenReturn(Collections.singletonList(mockDoc));
+
+        Task<QuerySnapshot> queryTask = buildQuerySuccessTask(mockQuerySnapshot);
+        when(mockQuery.get()).thenReturn(queryTask);
+
+        repository.searchUsers("bee", "uid-001", mockUserListCallback);
+
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(mockUserListCallback).onSuccess(captor.capture());
+        assertTrue(captor.getValue().isEmpty());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC170: searchUsers — Firestore trả empty → onSuccess với list rỗng
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_emptyFirestoreResult_callsOnSuccessWithEmptyList() {
+        when(mockQuerySnapshot.getDocuments()).thenReturn(Collections.emptyList());
+
+        Task<QuerySnapshot> queryTask = buildQuerySuccessTask(mockQuerySnapshot);
+        when(mockQuery.get()).thenReturn(queryTask);
+
+        repository.searchUsers("zzz", "uid-001", mockUserListCallback);
+
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(mockUserListCallback).onSuccess(captor.capture());
+        assertTrue(captor.getValue().isEmpty());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC171: searchUsers — keyword null → onError ngay, không gọi Firestore
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_nullKeyword_callsOnErrorImmediately() {
+        repository.searchUsers(null, "uid-001", mockUserListCallback);
+
+        verify(mockUserListCallback).onError("Từ khóa tìm kiếm không được để trống.");
+        verify(mockUserListCallback, never()).onSuccess(any());
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC172: searchUsers — keyword rỗng → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_emptyKeyword_callsOnErrorImmediately() {
+        repository.searchUsers("   ", "uid-001", mockUserListCallback);
+
+        verify(mockUserListCallback).onError("Từ khóa tìm kiếm không được để trống.");
+        verify(mockUserListCallback, never()).onSuccess(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC173: searchUsers — currentUserId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_nullCurrentUserId_callsOnErrorImmediately() {
+        repository.searchUsers("bee", null, mockUserListCallback);
+
+        verify(mockUserListCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockUserListCallback, never()).onSuccess(any());
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC174: searchUsers — Firestore fail → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void searchUsers_firestoreFails_callsOnErrorWithMessage() {
+        Exception exception = new Exception("Firestore timeout");
+        Task<QuerySnapshot> failTask = buildQueryFailureTask(exception);
+        when(mockQuery.get()).thenReturn(failTask);
+
+        repository.searchUsers("bee", "uid-001", mockUserListCallback);
+
+        verify(mockUserListCallback).onError("Firestore timeout");
+        verify(mockUserListCallback, never()).onSuccess(any());
+    }
+
+    // -----------------------------------------------------------------------
     // Helper: tạo mock Task<Void> thành công
     // -----------------------------------------------------------------------
 
@@ -342,6 +482,36 @@ public class UserRepositoryTest {
     @SuppressWarnings("unchecked")
     private Task<Void> buildVoidFailureTask(Exception exception) {
         Task<Void> mockTask = mock(Task.class);
+        when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
+        doAnswer(inv -> {
+            ((OnFailureListener) inv.getArgument(0)).onFailure(exception);
+            return mockTask;
+        }).when(mockTask).addOnFailureListener(any(OnFailureListener.class));
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<QuerySnapshot> thành công
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<QuerySnapshot> buildQuerySuccessTask(QuerySnapshot snapshot) {
+        Task<QuerySnapshot> mockTask = mock(Task.class);
+        doAnswer(inv -> {
+            ((OnSuccessListener<QuerySnapshot>) inv.getArgument(0)).onSuccess(snapshot);
+            return mockTask;
+        }).when(mockTask).addOnSuccessListener(any(OnSuccessListener.class));
+        when(mockTask.addOnFailureListener(any(OnFailureListener.class))).thenReturn(mockTask);
+        return mockTask;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: tạo mock Task<QuerySnapshot> thất bại
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Task<QuerySnapshot> buildQueryFailureTask(Exception exception) {
+        Task<QuerySnapshot> mockTask = mock(Task.class);
         when(mockTask.addOnSuccessListener(any(OnSuccessListener.class))).thenReturn(mockTask);
         doAnswer(inv -> {
             ((OnFailureListener) inv.getArgument(0)).onFailure(exception);

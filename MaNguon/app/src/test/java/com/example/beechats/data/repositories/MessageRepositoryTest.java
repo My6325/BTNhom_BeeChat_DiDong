@@ -100,6 +100,10 @@ public class MessageRepositoryTest {
     @Mock
     private DocumentSnapshot mockMsgSnapshot;
 
+    /** DocumentSnapshot trả về khi fetch member document (pinMessage/unpinMessage) */
+    @Mock
+    private DocumentSnapshot mockMemberSnapshot;
+
     @Captor
     private ArgumentCaptor<Map<String, Object>> mapCaptor;
 
@@ -1122,5 +1126,219 @@ public class MessageRepositoryTest {
 
         verify(mockStatusCallback).onError("Network error");
         verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC124: pinMessage — conversationId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_nullConversationId_callsOnError() {
+        repository.pinMessage(null, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC125: pinMessage — messageId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_nullMessageId_callsOnError() {
+        repository.pinMessage(CONV_ID, null, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID tin nhắn không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC126: pinMessage — requesterId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_nullRequesterId_callsOnError() {
+        repository.pinMessage(CONV_ID, TEST_MESSAGE_ID, null, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC127: pinMessage — member doc không tồn tại → onError("Không có quyền ghim tin nhắn.")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_memberNotExist_callsOnError() {
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+        when(mockMemberSnapshot.exists()).thenReturn(false);
+
+        repository.pinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Không có quyền ghim tin nhắn.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC128: pinMessage — role = "member" → onError("Chỉ admin mới được ghim tin nhắn.")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_memberRole_callsOnError() {
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("member");
+
+        repository.pinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Chỉ admin mới được ghim tin nhắn.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC129: pinMessage — role = "admin" → update isPinned=true, pinnedBy, pinnedAt → onSuccess
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_adminRole_callsUpdateAndOnSuccess() {
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.pinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockSpecificMsgRef).update(mapCaptor.capture());
+        Map<String, Object> updates = mapCaptor.getValue();
+        assertEquals(Boolean.TRUE, updates.get("isPinned"));
+        assertEquals(SENDER_ID, updates.get("pinnedBy"));
+        assertTrue("Phải có pinnedAt", updates.containsKey("pinnedAt"));
+        assertTrue("Phải có updatedAt", updates.containsKey("updatedAt"));
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC130: pinMessage — role = "admin" nhưng update thất bại → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_adminRole_updateFails_callsOnError() {
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Exception exception = new Exception("Firestore write error");
+        Task<Void> updateTask = buildVoidFailureTask(exception);
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.pinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Firestore write error");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC131: pinMessage — members.get() Firestore thất bại → onError(message)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void pinMessage_memberGetFails_callsOnError() {
+        Exception exception = new Exception("Firestore read error");
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotFailureTask(exception);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+
+        repository.pinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Firestore read error");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC132: unpinMessage — conversationId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void unpinMessage_nullConversationId_callsOnError() {
+        repository.unpinMessage(null, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID hội thoại không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC133: unpinMessage — messageId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void unpinMessage_nullMessageId_callsOnError() {
+        repository.unpinMessage(CONV_ID, null, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID tin nhắn không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC134: unpinMessage — requesterId null → onError ngay
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void unpinMessage_nullRequesterId_callsOnError() {
+        repository.unpinMessage(CONV_ID, TEST_MESSAGE_ID, null, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("ID người dùng không hợp lệ.");
+        verify(mockStatusCallback, never()).onSuccess();
+        verify(mockFirestore, never()).collection(anyString());
+    }
+
+    // -----------------------------------------------------------------------
+    // TC135: unpinMessage — role = "member" → onError("Chỉ admin mới được bỏ ghim tin nhắn.")
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void unpinMessage_memberRole_callsOnError() {
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("member");
+
+        repository.unpinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockStatusCallback).onError("Chỉ admin mới được bỏ ghim tin nhắn.");
+        verify(mockStatusCallback, never()).onSuccess();
+    }
+
+    // -----------------------------------------------------------------------
+    // TC136: unpinMessage — role = "admin" → update isPinned=false, delete pinnedBy/pinnedAt → onSuccess
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void unpinMessage_adminRole_callsUpdateAndOnSuccess() {
+        Task<DocumentSnapshot> memberGetTask = buildDocSnapshotSuccessTask(mockMemberSnapshot);
+        when(mockSpecificMsgRef.get()).thenReturn(memberGetTask);
+        when(mockMemberSnapshot.exists()).thenReturn(true);
+        when(mockMemberSnapshot.getString("role")).thenReturn("admin");
+        Task<Void> updateTask = buildVoidSuccessTask();
+        when(mockSpecificMsgRef.update(anyMap())).thenReturn(updateTask);
+
+        repository.unpinMessage(CONV_ID, TEST_MESSAGE_ID, SENDER_ID, mockStatusCallback);
+
+        verify(mockSpecificMsgRef).update(mapCaptor.capture());
+        Map<String, Object> updates = mapCaptor.getValue();
+        assertEquals(Boolean.FALSE, updates.get("isPinned"));
+        assertTrue("Phải có pinnedBy (FieldValue.delete)", updates.containsKey("pinnedBy"));
+        assertTrue("Phải có pinnedAt (FieldValue.delete)", updates.containsKey("pinnedAt"));
+        assertTrue("Phải có updatedAt", updates.containsKey("updatedAt"));
+        verify(mockStatusCallback).onSuccess();
+        verify(mockStatusCallback, never()).onError(anyString());
     }
 }

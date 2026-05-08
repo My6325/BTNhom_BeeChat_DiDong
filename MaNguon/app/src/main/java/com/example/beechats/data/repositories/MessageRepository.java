@@ -462,4 +462,119 @@ public class MessageRepository {
                 })
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
+
+    /**
+     * Ghim tin nhắn trong hội thoại nhóm — chỉ admin mới có quyền.
+     * Đọc members/{requesterId} để xác thực quyền trước khi update message document.
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param messageId      ID tin nhắn cần ghim (không được rỗng)
+     * @param requesterId    UID người yêu cầu ghim (phải là admin)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void pinMessage(String conversationId, String messageId, String requesterId,
+                           OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (messageId == null || messageId.trim().isEmpty()) {
+            callback.onError("ID tin nhắn không hợp lệ.");
+            return;
+        }
+        if (requesterId == null || requesterId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        // Xác thực quyền admin từ subcollection members/
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection("members")
+                .document(requesterId.trim())
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        callback.onError("Không có quyền ghim tin nhắn.");
+                        return;
+                    }
+                    String role = snapshot.getString("role");
+                    if (!"admin".equals(role)) {
+                        callback.onError("Chỉ admin mới được ghim tin nhắn.");
+                        return;
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("isPinned", true);
+                    updates.put("pinnedBy", requesterId.trim());
+                    updates.put("pinnedAt", FieldValue.serverTimestamp());
+                    updates.put("updatedAt", FieldValue.serverTimestamp());
+
+                    db.collection(CONV_COLLECTION)
+                            .document(conversationId)
+                            .collection(MSG_SUBCOLLECTION)
+                            .document(messageId.trim())
+                            .update(updates)
+                            .addOnSuccessListener(unused -> callback.onSuccess())
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                })
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
+     * Bỏ ghim tin nhắn trong hội thoại nhóm — chỉ admin mới có quyền.
+     * Xóa các trường pinnedBy và pinnedAt bằng FieldValue.delete().
+     *
+     * @param conversationId ID hội thoại (không được rỗng)
+     * @param messageId      ID tin nhắn cần bỏ ghim (không được rỗng)
+     * @param requesterId    UID người yêu cầu bỏ ghim (phải là admin)
+     * @param callback       Kết quả trả về (onSuccess hoặc onError)
+     */
+    public void unpinMessage(String conversationId, String messageId, String requesterId,
+                             OnMessageStatusCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (messageId == null || messageId.trim().isEmpty()) {
+            callback.onError("ID tin nhắn không hợp lệ.");
+            return;
+        }
+        if (requesterId == null || requesterId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        db.collection(CONV_COLLECTION)
+                .document(conversationId)
+                .collection("members")
+                .document(requesterId.trim())
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        callback.onError("Không có quyền bỏ ghim tin nhắn.");
+                        return;
+                    }
+                    String role = snapshot.getString("role");
+                    if (!"admin".equals(role)) {
+                        callback.onError("Chỉ admin mới được bỏ ghim tin nhắn.");
+                        return;
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("isPinned", false);
+                    updates.put("pinnedBy", FieldValue.delete());
+                    updates.put("pinnedAt", FieldValue.delete());
+                    updates.put("updatedAt", FieldValue.serverTimestamp());
+
+                    db.collection(CONV_COLLECTION)
+                            .document(conversationId)
+                            .collection(MSG_SUBCOLLECTION)
+                            .document(messageId.trim())
+                            .update(updates)
+                            .addOnSuccessListener(unused -> callback.onSuccess())
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                })
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
 }
