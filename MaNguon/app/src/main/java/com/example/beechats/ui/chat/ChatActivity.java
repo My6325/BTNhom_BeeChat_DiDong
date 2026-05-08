@@ -169,6 +169,7 @@ public class ChatActivity extends AppCompatActivity {
 
                         messageList.clear();
                         messageList.addAll(messages);
+                        messageAdapter.updateReadStatus();
                         messageAdapter.notifyDataSetChanged();
 
                         // Tự động cuộn xuống tin nhắn mới nhất

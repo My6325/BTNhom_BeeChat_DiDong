@@ -7,8 +7,8 @@
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/img_avatar"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
         android:layout_gravity="center"
         android:scaleType="centerCrop"
         android:src="@drawable/female_avatar"
@@ -16,8 +16,8 @@
 
     <ImageView
         android:id="@+id/img_khung_vien_avatar"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
         android:layout_gravity="center"
         android:src="@drawable/circle_vang_online" />
 
