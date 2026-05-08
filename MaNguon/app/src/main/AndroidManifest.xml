@@ -38,6 +38,10 @@
         <!-- Màn hình QRCode -->
         <activity android:name=".ui.onboarding.QRCode_Activity" android:exported="false" android:windowSoftInputMode="adjustPan" />
 
+        <!-- Màn hình Chat -->
+        <activity android:name=".ui.chat.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+
+
         <!-- FCM Service — nhận và cập nhật token push notification -->
         <service
             android:name=".services.BeeChatsMessagingService"

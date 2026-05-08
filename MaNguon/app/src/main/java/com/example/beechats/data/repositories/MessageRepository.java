@@ -220,8 +220,7 @@ public class MessageRepository {
         return db.collection(CONV_COLLECTION)
                 .document(conversationId)
                 .collection(MSG_SUBCOLLECTION)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
-                .limit(30)
+                .orderBy("createdAt", Query.Direction.ASCENDING)
                 .addSnapshotListener((snapshots, error) -> {
                     if (error != null) {
                         callback.onError(error.getMessage());
