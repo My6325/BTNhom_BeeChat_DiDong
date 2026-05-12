@@ -58,7 +58,6 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="10dp"
-            android:text="@string/Bee"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/black" />
@@ -68,7 +67,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:text="@string/gmail"
             android:textSize="14sp"
             android:textColor="@color/gray_dam" />
 
