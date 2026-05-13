@@ -24,7 +24,6 @@ public class BeeChatsApp extends Application {
     public void onCreate() {
         super.onCreate();
         FirebaseApp.initializeApp(this);
-        connectFirebaseEmulatorIfDebug();
         registerLifecycleObserver();
         initCloudinary();
     }
@@ -38,19 +37,6 @@ public class BeeChatsApp extends Application {
         ProcessLifecycleOwner.get().getLifecycle().addObserver(
                 new AppLifecycleObserver(FirebaseAuth.getInstance(), new UserRepository())
         );
-    }
-
-    /**
-     * Kết nối Firebase Emulator khi chạy DEBUG build.
-     * Dùng "localhost" vì ADB Reverse đã ánh xạ cổng từ thiết bị về máy tính.
-     * Lệnh cần chạy trước: adb reverse tcp:8080 tcp:8080 && adb reverse tcp:9099 tcp:9099
-     * Tạm vô hiệu hóa để test dữ liệu trực tiếp trên Firebase production.
-     */
-    private void connectFirebaseEmulatorIfDebug() {
-        // if (BuildConfig.DEBUG) {
-        //     FirebaseFirestore.getInstance().useEmulator("localhost", 8080);
-        //     FirebaseAuth.getInstance().useEmulator("localhost", 9099);
-        // }
     }
 
     private void initCloudinary() {
