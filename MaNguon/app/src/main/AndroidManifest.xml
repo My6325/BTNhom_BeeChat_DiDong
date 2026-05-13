@@ -4,6 +4,7 @@
 
     <application
         android:allowBackup="true"
+        android:name=".BeeChatsApp"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -11,20 +12,43 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.BeeChats">
+
+        <!-- MainActivity là LAUNCHER - điểm vào chính của app -->
         <activity
-            android:name=".Welcome_Activity"
+            android:name=".ui.main.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".Introduce_Activity" android:exported="false" />
-        <activity android:name=".Introduce_QR" android:exported="false" />
-        <activity android:name=".Introduce_Setting" android:exported="false" />
-        <activity android:name=".Introduce_Mail" android:exported="false" />
-        <activity android:name=".Login_Activity" />
-    </application>
 
+        <!-- Các màn hình onboarding (Welcome, Introduce,...) -->
+        <activity android:name=".ui.onboarding.WelcomeActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceQrActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceSettingActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.IntroduceMailActivity" android:exported="false" />
+
+        <!-- Màn hình xác thực -->
+        <activity android:name=".ui.auth.LoginActivity" android:exported="false" />
+        <activity android:name=".ui.onboarding.Register_Activity" android:exported="false" android:windowSoftInputMode="adjustPan"/>
+        <activity android:name=".ui.onboarding.ForgetPassword" android:exported="false" android:windowSoftInputMode="adjustPan" />
+
+        <!-- Màn hình QRCode -->
+        <activity android:name=".ui.onboarding.QRCode_Activity" android:exported="false" android:windowSoftInputMode="adjustPan" />
+
+        <!-- Màn hình Chat -->
+        <activity android:name=".ui.chat.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+
+
+        <!-- FCM Service — nhận và cập nhật token push notification -->
+        <service
+            android:name=".services.BeeChatsMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+    </application>
 </manifest>

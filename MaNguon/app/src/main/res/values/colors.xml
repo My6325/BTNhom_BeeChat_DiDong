@@ -3,5 +3,10 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="yellow">#ffd135</color>
+    <color name="yellow_light">#FFFC3D</color>
+    <color name="yellow_main">#FFE17A</color>
+    <color name="yellow_call">#FFC500</color>
     <color name="gray">#E0E0E0</color>
+    <color name="gray_dam">#565656</color>
+    <color name="blue">#310DFD</color>
 </resources>

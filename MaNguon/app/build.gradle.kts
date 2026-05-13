@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -29,6 +30,16 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    buildFeatures {
+        buildConfig = true
+    }
+    testOptions {
+        unitTests {
+            // Cho phép android.util.Log và các Android SDK stub trả default value
+            // thay vì throw RuntimeException trong unit tests
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -38,6 +49,16 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.constraintlayout)
     testImplementation(libs.junit)
+    testImplementation("org.mockito:mockito-core:5.11.0")
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
+    implementation("com.google.firebase:firebase-auth") // Cho xác thực
+    implementation("com.google.firebase:firebase-firestore") // Cho lưu trữ dữ liệu
+    implementation("com.google.firebase:firebase-messaging") // Cho thông báo đẩy
+    implementation("com.cloudinary:cloudinary-android:3.1.2") // Cho lưu trữ media (thay Firebase Storage)
+    implementation("com.github.bumptech.glide:glide:4.16.0") // Cho tải ảnh
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0") // Cho Glide annotation processing
+    // ProcessLifecycleOwner — theo dõi foreground/background của toàn bộ app
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
 }

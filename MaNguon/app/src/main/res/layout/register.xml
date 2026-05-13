@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".ui.onboarding.Register_Activity"
+    android:background="@color/yellow">
+
+    <ImageView
+        android:layout_width="200dp"
+        android:layout_height="170dp"
+        android:src="@drawable/bee_logo"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:rotation="35"
+        android:layout_marginStart="-60dp"/>
+
+    <ImageView
+        android:layout_width="200dp"
+        android:layout_height="170dp"
+        android:src="@drawable/bee_logo"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:rotation="-90"
+        android:layout_marginTop="30dp"
+        android:layout_marginEnd="-70dp"/>
+
+    <ImageView
+        android:id="@+id/btnBack"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/back"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="50dp"
+        android:layout_marginStart="30dp"
+        android:elevation="2dp"
+        android:padding="5dp"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/btnBack"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:layout_marginTop="40sp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="35dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="40dp"
+            android:gravity="center_horizontal">
+
+            <TextView
+                style="@style/LabelStyle"
+                android:text="Địa chỉ mail/SĐT:"
+                android:layout_width="match_parent"
+                android:layout_marginStart="8dp"/>
+            <EditText
+                android:id="@+id/edtEmailRegister"
+                style="@style/InputStyle"
+                android:hint="@string/gmail"
+                android:inputType="textEmailAddress"
+                android:imeOptions="actionNext"/>
+
+            <TextView
+                style="@style/LabelStyle"
+                android:text="Tên đăng nhập:"
+                android:layout_width="match_parent"
+                android:layout_marginTop="10dp"
+                android:layout_marginStart="8dp"/>
+            <EditText
+                android:id="@+id/edtUsername"
+                style="@style/InputStyle"
+                android:inputType="textPersonName"
+                android:imeOptions="actionNext"/>
+
+            <TextView
+                style="@style/LabelStyle"
+                android:text="Nhập mật khẩu:"
+                android:layout_width="match_parent"
+                android:layout_marginTop="10dp"
+                android:layout_marginStart="8dp"/>
+            <EditText
+                android:id="@+id/edtPasswordRegister"
+                style="@style/InputStyle"
+                android:inputType="textPassword"
+                android:imeOptions="actionNext"/>
+
+            <TextView
+                style="@style/LabelStyle"
+                android:text="Xác nhận mật khẩu:"
+                android:layout_width="match_parent"
+                android:layout_marginTop="10dp"
+                android:layout_marginStart="8dp"/>
+            <EditText
+                android:id="@+id/edtConfirmPassword"
+                style="@style/InputStyle"
+                android:inputType="textPassword"
+                android:imeOptions="actionDone"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="15dp">
+
+                <CheckBox
+                    android:id="@+id/cbAgree"
+                    android:layout_width="35dp"
+                    android:layout_height="30dp"
+                    android:background="@drawable/btn_khung_white"
+                    android:checked="false"
+                    android:button="@null"
+                    android:layout_marginEnd="10dp"/>
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/toi_dong_y"
+                    android:textColor="@color/black"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnCreateAccount"
+                android:layout_width="250dp"
+                android:layout_height="50dp"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/btn_khung_white"
+                app:backgroundTint="@null"
+                android:layout_marginTop="25dp"
+                android:text="@string/sign_up"
+                android:textColor="@color/black"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"/>
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>
