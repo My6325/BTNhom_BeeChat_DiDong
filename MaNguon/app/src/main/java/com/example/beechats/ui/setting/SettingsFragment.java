@@ -1,5 +1,6 @@
 package com.example.beechats.ui.setting;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.beechats.R;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.UserRepository;
+import com.example.beechats.ui.onboarding.QRCode_Activity;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -42,6 +44,9 @@ public class SettingsFragment extends Fragment {
         switchDarkMode = view.findViewById(R.id.switch_dark_mode);
         switchStatus = view.findViewById(R.id.switch_status);
         rvAccount = view.findViewById(R.id.rv_Account);
+
+        view.findViewById(R.id.btn_menu_qr).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), QRCode_Activity.class)));
 
         // Khởi tạo Repository và Auth
         userRepository = new UserRepository();

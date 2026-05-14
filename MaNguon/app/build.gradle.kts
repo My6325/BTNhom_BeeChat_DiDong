@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     testImplementation(libs.junit)
     testImplementation("org.mockito:mockito-core:5.11.0")
     androidTestImplementation(libs.ext.junit)

@@ -32,4 +32,14 @@
     <string name="che_do">Chế độ tối</string>
     <string name="trang_thai">Trạng thái hoạt động</string>
     <string name="notice_sound">Thông báo và âm thanh</string>
+    <string name="qr_scan_prompt">Đưa mã QR BeeChats vào khung để quét</string>
+    <string name="qr_invalid">Mã QR không hợp lệ hoặc không thuộc BeeChats.</string>
+    <string name="qr_camera_denied">Bạn cần cấp quyền camera để quét mã QR.</string>
+    <string name="qr_self_scan_error">Bạn không thể quét mã QR của chính mình.</string>
+    <string name="qr_login_required">Vui lòng đăng nhập để dùng tính năng mã QR.</string>
+    <string name="qr_loading_error">Không thể tải thông tin người dùng.</string>
+    <string name="qr_send_request_success">Đã gửi lời mời kết bạn tới %1$s.</string>
+    <string name="qr_user_not_found">Không tìm thấy người dùng của mã QR này.</string>
+    <string name="qr_generate_error">Không thể tạo mã QR lúc này.</string>
+    <string name="your_name">Your name</string>
 </resources>
