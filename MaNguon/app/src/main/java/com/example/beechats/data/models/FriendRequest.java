@@ -4,8 +4,8 @@ import com.google.firebase.Timestamp;
 
 public class FriendRequest {
     private String requestId;
-    private String fromUserId;
-    private String toUserId;
+    private String senderId;
+    private String receiverId;
     private String status;
     private Timestamp createdAt;
     private Timestamp updatedAt;
@@ -20,20 +20,20 @@ public class FriendRequest {
         this.requestId = requestId;
     }
 
-    public String getFromUserId() {
-        return fromUserId;
+    public String getSenderId() {
+        return senderId;
     }
 
-    public void setFromUserId(String fromUserId) {
-        this.fromUserId = fromUserId;
+    public void setSenderId(String senderId) {
+        this.senderId = senderId;
     }
 
-    public String getToUserId() {
-        return toUserId;
+    public String getReceiverId() {
+        return receiverId;
     }
 
-    public void setToUserId(String toUserId) {
-        this.toUserId = toUserId;
+    public void setReceiverId(String receiverId) {
+        this.receiverId = receiverId;
     }
 
     public String getStatus() {

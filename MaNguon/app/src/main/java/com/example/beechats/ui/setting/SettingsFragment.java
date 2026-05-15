@@ -48,6 +48,9 @@ public class SettingsFragment extends Fragment {
         view.findViewById(R.id.btn_menu_qr).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), QRCode_Activity.class)));
 
+        view.findViewById(R.id.row_change_password).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), ChangePasswordActivity.class)));
+
         // Khởi tạo Repository và Auth
         userRepository = new UserRepository();
         mAuth = FirebaseAuth.getInstance();

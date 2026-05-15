@@ -86,11 +86,23 @@
                 android:layout_width="match_parent"
                 android:layout_marginTop="10dp"
                 android:layout_marginStart="8dp"/>
-            <EditText
-                android:id="@+id/edtPasswordRegister"
-                style="@style/InputStyle"
-                android:inputType="textPassword"
-                android:imeOptions="actionNext"/>
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <EditText
+                    android:id="@+id/edtPassword"
+                    style="@style/InputStyle"
+                    android:inputType="textPassword"
+                    android:imeOptions="actionNext"/>
+                <ImageView
+                    android:id="@+id/btnSeePassword"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="15dp"
+                    android:src="@drawable/eye_close" />
+            </RelativeLayout>
 
             <TextView
                 style="@style/LabelStyle"
@@ -98,11 +110,23 @@
                 android:layout_width="match_parent"
                 android:layout_marginTop="10dp"
                 android:layout_marginStart="8dp"/>
-            <EditText
-                android:id="@+id/edtConfirmPassword"
-                style="@style/InputStyle"
-                android:inputType="textPassword"
-                android:imeOptions="actionDone"/>
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <EditText
+                    android:id="@+id/edtConfirmPassword"
+                    style="@style/InputStyle"
+                    android:inputType="textPassword"
+                    android:imeOptions="actionDone"/>
+                <ImageView
+                    android:id="@+id/btnSeePassword_confirm"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="15dp"
+                    android:src="@drawable/eye_close" />
+            </RelativeLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -113,12 +137,12 @@
 
                 <CheckBox
                     android:id="@+id/cbAgree"
-                    android:layout_width="35dp"
-                    android:layout_height="30dp"
-                    android:background="@drawable/btn_khung_white"
+                    style="@style/Widget.BeeChats.CheckBox.RegisterTerms"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="10dp"
                     android:checked="false"
-                    android:button="@null"
-                    android:layout_marginEnd="10dp"/>
+                    app:buttonTint="@null"/>
 
                 <TextView
                     android:layout_width="0dp"
