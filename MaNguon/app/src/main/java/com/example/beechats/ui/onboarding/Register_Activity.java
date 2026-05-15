@@ -84,17 +84,20 @@ public class Register_Activity extends AppCompatActivity {
 
     private void setupPasswordToggle(ImageView toggleBtn, EditText editText) {
         toggleBtn.setOnClickListener(v -> {
-            boolean visible = (editText.getInputType()
-                    & InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) != 0;
-            if (visible) {
-                editText.setInputType(InputType.TYPE_CLASS_TEXT
-                        | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            // Kiểm tra chính xác giá trị InputType hiện tại
+            boolean isVisible = editText.getInputType() == (InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+
+            if (isVisible) {
+                // Đang hiện -> Chuyển sang ẩn (Password)
+                editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                 toggleBtn.setImageResource(R.drawable.eye_close);
             } else {
-                editText.setInputType(InputType.TYPE_CLASS_TEXT
-                        | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                // Đang ẩn -> Chuyển sang hiện (Visible Password)
+                editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
                 toggleBtn.setImageResource(R.drawable.eye);
             }
+
+            // Đưa con trỏ nhấp nháy về cuối cùng để không bị nhảy chuỗi
             editText.setSelection(editText.getText().length());
         });
     }

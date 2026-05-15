@@ -92,6 +92,7 @@
                 <EditText
                     android:id="@+id/edtPassword"
                     style="@style/InputStyle"
+                    android:paddingEnd="45dp"
                     android:inputType="textPassword"
                     android:imeOptions="actionNext"/>
                 <ImageView
@@ -116,6 +117,7 @@
                 <EditText
                     android:id="@+id/edtConfirmPassword"
                     style="@style/InputStyle"
+                    android:paddingEnd="45dp"
                     android:inputType="textPassword"
                     android:imeOptions="actionDone"/>
                 <ImageView
