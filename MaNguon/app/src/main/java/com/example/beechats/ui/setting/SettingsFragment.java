@@ -18,12 +18,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.beechats.R;
+import com.example.beechats.data.local.SavedAccountManager;
+import com.example.beechats.data.models.SavedAccount;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.UserRepository;
+import com.example.beechats.ui.auth.LoginActivity;
 import com.example.beechats.ui.onboarding.QRCode_Activity;
 import com.example.beechats.utils.ThemeHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+
+import java.util.List;
 
 public class SettingsFragment extends Fragment {
 
@@ -77,6 +82,9 @@ public class SettingsFragment extends Fragment {
         view.findViewById(R.id.btn_menu_qr).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), QRCode_Activity.class)));
 
+        view.findViewById(R.id.row_change_password).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), ChangePasswordActivity.class)));
+
         // Khởi tạo Repository và Auth
         userRepository = new UserRepository();
         mAuth = FirebaseAuth.getInstance();
@@ -85,10 +93,24 @@ public class SettingsFragment extends Fragment {
         switchDarkMode.setOnCheckedChangeListener(darkModeListener);
 
         // Thiết lập RecyclerView cho danh sách tài khoản
-        rvAccount.setLayoutManager(new LinearLayoutManager(getContext()));
-        // TODO: Cài đặt Adapter cho recyclerAccount nếu cần thiết
-        loadUserProfile();
+
         return view;
+    }
+
+    private void loadSavedAccounts() {
+        List<SavedAccount> accounts = SavedAccountManager.getSavedAccounts(requireContext());
+        AccountAdapter adapter = new AccountAdapter(accounts, new AccountAdapter.OnAccountClickListener() {
+            @Override
+            public void onAccountClick(SavedAccount account) {
+                // TODO: chuyển đổi tài khoản nếu cần
+            }
+
+            @Override
+            public void onAddAccountClick() {
+                startActivity(new Intent(requireContext(), LoginActivity.class));
+            }
+        });
+        rvAccount.setAdapter(adapter);
     }
 
     private void loadUserProfile() {
