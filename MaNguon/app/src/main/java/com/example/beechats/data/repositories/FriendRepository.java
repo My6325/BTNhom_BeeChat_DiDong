@@ -81,8 +81,8 @@ public class FriendRepository {
 
         Map<String, Object> data = new HashMap<>();
         data.put("requestId", requestId);
-        data.put("fromUserId", fromUid.trim());
-        data.put("toUserId", toUid.trim());
+        data.put("senderId", fromUid.trim());
+        data.put("receiverId", toUid.trim());
         data.put("status", "pending");
         data.put("createdAt", FieldValue.serverTimestamp());
         data.put("updatedAt", FieldValue.serverTimestamp());
@@ -232,7 +232,7 @@ public class FriendRepository {
         }
 
         db.collection(FRIEND_REQUESTS)
-                .whereEqualTo("toUserId", uid.trim())
+                .whereEqualTo("receiverId", uid.trim())
                 .whereEqualTo("status", "pending")
                 .get()
                 .addOnSuccessListener(querySnapshot -> {

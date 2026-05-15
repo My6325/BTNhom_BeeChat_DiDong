@@ -93,7 +93,6 @@ public class SettingsFragment extends Fragment {
         switchDarkMode.setOnCheckedChangeListener(darkModeListener);
 
         // Thiết lập RecyclerView cho danh sách tài khoản
-
         return view;
     }
 
