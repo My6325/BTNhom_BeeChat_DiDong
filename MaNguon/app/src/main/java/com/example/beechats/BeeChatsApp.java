@@ -5,12 +5,11 @@ import android.app.Application;
 import androidx.lifecycle.ProcessLifecycleOwner;
 
 import com.cloudinary.android.MediaManager;
-import com.example.beechats.BuildConfig;
 import com.example.beechats.data.repositories.UserRepository;
 import com.example.beechats.utils.AppLifecycleObserver;
+import com.example.beechats.utils.ThemeHelper;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +22,7 @@ public class BeeChatsApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        ThemeHelper.applyStoredNightMode(this);
         FirebaseApp.initializeApp(this);
         registerLifecycleObserver();
         initCloudinary();

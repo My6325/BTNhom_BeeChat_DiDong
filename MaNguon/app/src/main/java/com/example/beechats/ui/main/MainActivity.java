@@ -9,12 +9,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.beechats.R;
+import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.FirebaseAuthRepository;
+import com.example.beechats.data.repositories.UserRepository;
+import com.example.beechats.utils.ThemeHelper;
 import com.example.beechats.ui.auth.LoginActivity;
 import com.example.beechats.ui.chat.ChatListFragment;
 import com.example.beechats.ui.friend.FriendsFragment;
 import com.example.beechats.ui.onboarding.WelcomeActivity;
-import com.example.beechats.ui.onboarding.QRCode_Activity;
+import com.example.beechats.ui.onboarding.ScanQrActivity;
 import com.example.beechats.ui.setting.SettingsFragment;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -73,10 +76,25 @@ public class MainActivity extends AppCompatActivity {
         ImageView imgScanQr = findViewById(R.id.img_scan_qr);
 
         imgScanQr.setOnClickListener(v ->
-                startActivity(new Intent(this, QRCode_Activity.class)));
+                startActivity(new Intent(this, ScanQrActivity.class)));
+
+        int pendingNav = ThemeHelper.consumePendingBottomNavItem(this);
+        int startMenuId = pendingNav != 0 ? pendingNav : R.id.menu_chat;
+
+        Fragment startFragment;
+        if (startMenuId == R.id.menu_settings) {
+            startFragment = new SettingsFragment();
+            headerContainer.setVisibility(View.GONE);
+        } else if (startMenuId == R.id.menu_friends) {
+            startFragment = new FriendsFragment();
+            headerContainer.setVisibility(View.VISIBLE);
+        } else {
+            startFragment = new ChatListFragment();
+            headerContainer.setVisibility(View.VISIBLE);
+        }
 
         getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, new ChatListFragment())
+                .replace(R.id.fragment_container, startFragment)
                 .commit();
 
         bottomNavigationView.setOnItemSelectedListener(item -> {
@@ -98,6 +116,32 @@ public class MainActivity extends AppCompatActivity {
                         .commit();
             }
             return true;
+        });
+
+        bottomNavigationView.post(() -> bottomNavigationView.setSelectedItemId(startMenuId));
+
+        syncDarkModeFromFirestore();
+    }
+
+    /** Đồng bộ chế độ tối từ Firestore (settings.darkMode) với máy khi vào màn chính. */
+    private void syncDarkModeFromFirestore() {
+        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+        if (u == null) {
+            return;
+        }
+        new UserRepository().getUser(u.getUid(), new UserRepository.OnUserCallback() {
+            @Override
+            public void onSuccess(User user) {
+                boolean dark = user.getSettings() != null && user.getSettings().isDarkMode();
+                if (ThemeHelper.getStoredDarkMode(MainActivity.this) != dark) {
+                    ThemeHelper.setDarkModeEnabled(MainActivity.this, dark);
+                }
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                // Giữ theo prefs local
+            }
         });
     }
 

@@ -77,8 +77,11 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:layout_marginStart="10dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/qr_scan_content_desc"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_qrcode"/>
+                android:src="@drawable/ic_qrcode"
+                app:tint="@color/qr_scan_icon" />
 
         </LinearLayout>
     </LinearLayout>

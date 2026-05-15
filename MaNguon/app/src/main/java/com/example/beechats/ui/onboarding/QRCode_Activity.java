@@ -21,6 +21,7 @@ import com.example.beechats.R;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.FriendRepository;
 import com.example.beechats.data.repositories.UserRepository;
+import com.example.beechats.utils.QrScanInviteHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.zxing.BarcodeFormat;
@@ -32,8 +33,6 @@ import com.journeyapps.barcodescanner.ScanIntentResult;
 import com.journeyapps.barcodescanner.ScanOptions;
 
 public class QRCode_Activity extends AppCompatActivity {
-    private static final String QR_SCHEME = "beechats";
-    private static final String QR_HOST = "user";
     private static final int QR_SIZE_DP = 256;
 
     private ImageView btnBack;
@@ -176,79 +175,22 @@ public class QRCode_Activity extends AppCompatActivity {
     }
 
     private void handleScanResult(ScanIntentResult result) {
-        String rawContent = result.getContents();
-        if (TextUtils.isEmpty(rawContent)) {
-            return;
-        }
-
-        String scannedUserId = extractUserIdFromQr(rawContent);
-        if (TextUtils.isEmpty(scannedUserId)) {
-            showToast(getString(R.string.qr_invalid));
-            return;
-        }
-
-        if (scannedUserId.equals(currentUserId)) {
-            showToast(getString(R.string.qr_self_scan_error));
-            return;
-        }
-
-        userRepository.getUser(scannedUserId, new UserRepository.OnUserCallback() {
-            @Override
-            public void onSuccess(User user) {
-                sendFriendRequest(scannedUserId, resolveTargetDisplayName(user));
-            }
-
-            @Override
-            public void onError(String errorMessage) {
-                showToast(getString(R.string.qr_user_not_found));
-            }
-        });
-    }
-
-    private void sendFriendRequest(String targetUserId, String targetDisplayName) {
-        friendRepository.sendFriendRequest(currentUserId, targetUserId,
-                new FriendRepository.OnFriendRequestCallback() {
-                    @Override
-                    public void onSuccess(String requestId) {
-                        showToast(getString(R.string.qr_send_request_success, targetDisplayName));
-                    }
-
-                    @Override
-                    public void onError(String errorMessage) {
-                        showToast(errorMessage);
-                    }
-                });
+        QrScanInviteHelper.processQrScanForFriendInvite(
+                this,
+                result.getContents(),
+                currentUserId,
+                userRepository,
+                friendRepository,
+                null);
     }
 
     private String buildQrPayload(String userId) {
         return new Uri.Builder()
-                .scheme(QR_SCHEME)
-                .authority(QR_HOST)
+                .scheme(QrScanInviteHelper.QR_SCHEME)
+                .authority(QrScanInviteHelper.QR_HOST)
                 .appendPath(userId)
                 .build()
                 .toString();
-    }
-
-    private String extractUserIdFromQr(String rawContent) {
-        String trimmedContent = rawContent != null ? rawContent.trim() : "";
-        if (trimmedContent.isEmpty()) {
-            return null;
-        }
-
-        Uri uri = Uri.parse(trimmedContent);
-        if (QR_SCHEME.equalsIgnoreCase(uri.getScheme())
-                && QR_HOST.equalsIgnoreCase(uri.getAuthority())
-                && !uri.getPathSegments().isEmpty()) {
-            String userId = uri.getPathSegments().get(0);
-            return userId != null && !userId.trim().isEmpty() ? userId.trim() : null;
-        }
-
-        // Fallback cho trường hợp QR chỉ chứa trực tiếp UID.
-        if (trimmedContent.matches("[A-Za-z0-9_-]{10,}")) {
-            return trimmedContent;
-        }
-
-        return null;
     }
 
     private String resolveCurrentUserDisplayName(User user) {
@@ -260,16 +202,6 @@ public class QRCode_Activity extends AppCompatActivity {
         }
         if (currentUser != null && !TextUtils.isEmpty(currentUser.getEmail())) {
             return currentUser.getEmail().trim();
-        }
-        return getString(R.string.app_name);
-    }
-
-    private String resolveTargetDisplayName(User user) {
-        if (user != null && !TextUtils.isEmpty(user.getDisplayName())) {
-            return user.getDisplayName().trim();
-        }
-        if (user != null && !TextUtils.isEmpty(user.getEmail())) {
-            return user.getEmail().trim();
         }
         return getString(R.string.app_name);
     }

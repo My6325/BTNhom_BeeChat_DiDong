@@ -39,6 +39,10 @@
 
         <!-- Màn hình QRCode -->
         <activity android:name=".ui.onboarding.QRCode_Activity" android:exported="false" android:windowSoftInputMode="adjustPan" />
+        <activity
+            android:name=".ui.onboarding.ScanQrActivity"
+            android:exported="false"
+            android:theme="@style/Theme.BeeChats.ScanQr" />
 
         <!-- Màn hình Chat -->
         <activity android:name=".ui.chat.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />

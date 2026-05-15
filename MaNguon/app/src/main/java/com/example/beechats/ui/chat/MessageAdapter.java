@@ -1,12 +1,12 @@
 package com.example.beechats.ui.chat;
 
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.beechats.R;
@@ -146,7 +146,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             if (message.isRecalled()) {
                 tvMessage.setText("Tin nhắn đã thu hồi");
                 tvMessage.setAlpha(0.5f);
-                tvMessage.setTextColor(Color.parseColor("#888888"));
+                tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.gray_dam));
                 tvStatusText.setVisibility(View.GONE);
                 imgReadAvatar.setVisibility(View.GONE);
                 return;
@@ -154,6 +154,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
             tvMessage.setText(message.getText());
             tvMessage.setAlpha(1.0f);
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
 
             if (showAvatar && isRead) {
                 // Tin nhắn cuối cùng được đọc → hiện avatar người nhận
@@ -185,11 +186,11 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             if (message.isRecalled()) {
                 txtMessage.setText("Tin nhắn đã thu hồi");
                 txtMessage.setAlpha(0.5f);
-                txtMessage.setTextColor(Color.parseColor("#888888"));
+                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.gray_dam));
             } else {
                 txtMessage.setText(message.getText());
                 txtMessage.setAlpha(1.0f);
-                txtMessage.setTextColor(Color.parseColor("#000000"));
+                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
             }
         }
     }

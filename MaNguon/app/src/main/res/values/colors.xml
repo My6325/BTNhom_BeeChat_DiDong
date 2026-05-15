@@ -2,11 +2,15 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="yellow">#ffd135</color>
-    <color name="yellow_light">#FFFC3D</color>
-    <color name="yellow_main">#FFE17A</color>
-    <color name="yellow_call">#FFC500</color>
+    <color name="yellow">#E6AE00</color>
+    <color name="yellow_light">#FFD84D</color>
+    <color name="yellow_main">#F4C64D</color>
+    <color name="yellow_call">#D99600</color>
     <color name="gray">#E0E0E0</color>
-    <color name="gray_dam">#565656</color>
+    <color name="gray_dam">#595959</color>
+    <color name="chat_background">#1F1F1F</color>
+    <color name="chat_bubble_friend">#575757</color>
+    <color name="chat_bubble_border">#FFE08A</color>
     <color name="blue">#310DFD</color>
+    <color name="qr_scan_icon">#FF000000</color>
 </resources>
