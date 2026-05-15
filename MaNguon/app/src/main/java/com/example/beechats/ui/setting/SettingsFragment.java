@@ -17,11 +17,16 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.beechats.R;
+import com.example.beechats.data.local.SavedAccountManager;
+import com.example.beechats.data.models.SavedAccount;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.UserRepository;
+import com.example.beechats.ui.auth.LoginActivity;
 import com.example.beechats.ui.onboarding.QRCode_Activity;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+
+import java.util.List;
 
 public class SettingsFragment extends Fragment {
 
@@ -55,11 +60,26 @@ public class SettingsFragment extends Fragment {
         userRepository = new UserRepository();
         mAuth = FirebaseAuth.getInstance();
 
-        // Thiết lập RecyclerView cho danh sách tài khoản
         rvAccount.setLayoutManager(new LinearLayoutManager(getContext()));
-        // TODO: Cài đặt Adapter cho recyclerAccount nếu cần thiết
+        loadSavedAccounts();
         loadUserProfile();
         return view;
+    }
+
+    private void loadSavedAccounts() {
+        List<SavedAccount> accounts = SavedAccountManager.getSavedAccounts(requireContext());
+        AccountAdapter adapter = new AccountAdapter(accounts, new AccountAdapter.OnAccountClickListener() {
+            @Override
+            public void onAccountClick(SavedAccount account) {
+                // TODO: chuyển đổi tài khoản nếu cần
+            }
+
+            @Override
+            public void onAddAccountClick() {
+                startActivity(new Intent(requireContext(), LoginActivity.class));
+            }
+        });
+        rvAccount.setAdapter(adapter);
     }
 
     private void loadUserProfile() {

@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Patterns;
 import android.view.MotionEvent;
@@ -19,12 +20,17 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.beechats.R;
+import com.example.beechats.data.local.SavedAccountManager;
 import com.example.beechats.data.repositories.FirebaseAuthRepository;
 import com.example.beechats.ui.main.MainActivity;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 public class Register_Activity extends AppCompatActivity {
 
     private ImageView btnBack;
+    private ImageView btnSeePassword;
+    private ImageView btnSeePasswordConfirm;
     private EditText edtEmail;
     private EditText edtUsername;
     private EditText edtPassword;
@@ -46,6 +52,8 @@ public class Register_Activity extends AppCompatActivity {
 
     private void initViews() {
         btnBack = findViewById(R.id.btnBack);
+        btnSeePassword = findViewById(R.id.btnSeePassword);
+        btnSeePasswordConfirm = findViewById(R.id.btnSeePassword_confirm);
         edtEmail = findViewById(R.id.edtEmailRegister);
         edtUsername = findViewById(R.id.edtUsername);
         edtPassword = findViewById(R.id.edtPassword);
@@ -69,6 +77,26 @@ public class Register_Activity extends AppCompatActivity {
         });
 
         btnCreateAccount.setOnClickListener(v -> attemptRegister());
+
+        setupPasswordToggle(btnSeePassword, edtPassword);
+        setupPasswordToggle(btnSeePasswordConfirm, edtConfirmPassword);
+    }
+
+    private void setupPasswordToggle(ImageView toggleBtn, EditText editText) {
+        toggleBtn.setOnClickListener(v -> {
+            boolean visible = (editText.getInputType()
+                    & InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) != 0;
+            if (visible) {
+                editText.setInputType(InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                toggleBtn.setImageResource(R.drawable.eye_close);
+            } else {
+                editText.setInputType(InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                toggleBtn.setImageResource(R.drawable.eye);
+            }
+            editText.setSelection(editText.getText().length());
+        });
     }
 
     private void attemptRegister() {
@@ -86,6 +114,11 @@ public class Register_Activity extends AppCompatActivity {
         authRepository.register(email, password, username, new FirebaseAuthRepository.OnAuthCallback() {
             @Override
             public void onSuccess() {
+                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                if (user != null) {
+                    SavedAccountManager.saveAccount(Register_Activity.this,
+                            user.getUid(), username, email, null);
+                }
                 showLoading(false);
                 showToast("Đăng ký thành công!");
                 navigateToMain();

@@ -4,6 +4,7 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
@@ -24,6 +25,9 @@ import com.google.firebase.auth.FirebaseUser;
 public class ChangePasswordActivity extends AppCompatActivity {
 
     private ImageView btnBack;
+    private ImageView btnPasswordNow;
+    private ImageView btnPasswordNew;
+    private ImageView btnPasswordNewConfirm;
     private EditText edtCurrentPassword;
     private EditText edtNewPassword;
     private EditText edtConfirmPassword;
@@ -56,6 +60,9 @@ public class ChangePasswordActivity extends AppCompatActivity {
 
     private void initViews() {
         btnBack = findViewById(R.id.btnBack);
+        btnPasswordNow = findViewById(R.id.btnPasswordNow);
+        btnPasswordNew = findViewById(R.id.btnPasswordNew);
+        btnPasswordNewConfirm = findViewById(R.id.btnPasswordNew_Confirm);
         edtCurrentPassword = findViewById(R.id.edtCurrentPassword);
         edtNewPassword = findViewById(R.id.edtNewPassword);
         edtConfirmPassword = findViewById(R.id.edtConfirmPassword);
@@ -73,6 +80,27 @@ public class ChangePasswordActivity extends AppCompatActivity {
         });
 
         btnSavePassword.setOnClickListener(v -> attemptChangePassword());
+
+        setupPasswordToggle(btnPasswordNow, edtCurrentPassword);
+        setupPasswordToggle(btnPasswordNew, edtNewPassword);
+        setupPasswordToggle(btnPasswordNewConfirm, edtConfirmPassword);
+    }
+
+    private void setupPasswordToggle(ImageView toggleBtn, EditText editText) {
+        toggleBtn.setOnClickListener(v -> {
+            boolean visible = (editText.getInputType()
+                    & InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) != 0;
+            if (visible) {
+                editText.setInputType(InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                toggleBtn.setImageResource(R.drawable.eye_close);
+            } else {
+                editText.setInputType(InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                toggleBtn.setImageResource(R.drawable.eye);
+            }
+            editText.setSelection(editText.getText().length());
+        });
     }
 
     private void attemptChangePassword() {
