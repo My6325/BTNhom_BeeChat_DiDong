@@ -92,6 +92,9 @@ public class SettingsFragment extends Fragment {
         setDarkSwitchWithoutEvent(ThemeHelper.getStoredDarkMode(requireContext()));
         switchDarkMode.setOnCheckedChangeListener(darkModeListener);
 
+        rvAccount.setLayoutManager(new LinearLayoutManager(getContext()));
+        loadSavedAccounts();
+        loadUserProfile();
         // Thiết lập RecyclerView cho danh sách tài khoản
         return view;
     }
