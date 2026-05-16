@@ -16,6 +16,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.example.beechats.R;
 import com.example.beechats.data.local.SavedAccountManager;
 import com.example.beechats.data.models.SavedAccount;
@@ -56,6 +57,13 @@ public class SettingsFragment extends Fragment {
         view.findViewById(R.id.row_change_password).setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), ChangePasswordActivity.class)));
 
+        view.findViewById(R.id.btn_exit_account).setOnClickListener(v -> {
+            FirebaseAuth.getInstance().signOut();
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        });
+
         // Khởi tạo Repository và Auth
         userRepository = new UserRepository();
         mAuth = FirebaseAuth.getInstance();
@@ -71,12 +79,20 @@ public class SettingsFragment extends Fragment {
         AccountAdapter adapter = new AccountAdapter(accounts, new AccountAdapter.OnAccountClickListener() {
             @Override
             public void onAccountClick(SavedAccount account) {
-                // TODO: chuyển đổi tài khoản nếu cần
-            }
+                // Đăng xuất tài khoản hiện tại trên Firebase
+                FirebaseAuth.getInstance().signOut();
 
-            @Override
-            public void onAddAccountClick() {
-                startActivity(new Intent(requireContext(), LoginActivity.class));
+                // Intent chuyển về màn hình Đăng nhập
+                Intent intent = new Intent(requireContext(), LoginActivity.class);
+
+                // Đính kèm email của tài khoản được click để truyền sang LoginActivity
+                if (account.getEmail() != null) {
+                    intent.putExtra("SWITCH_ACCOUNT_EMAIL", account.getEmail());
+                }
+
+                //Xóa lịch sử các màn hình cũ --> giúp app không bị xếp chồng quá nhiều gây loú khi sử dụng back
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
             }
         });
         rvAccount.setAdapter(adapter);
@@ -94,8 +110,17 @@ public class SettingsFragment extends Fragment {
                     if (isAdded()) { // Kiểm tra Fragment còn gắn vào Activity không
                         txtName.setText(user.getDisplayName());
                         txtEmail.setText(user.getEmail());
-                        // load avatar if using Glide/Picasso
-                        // Glide.with(getContext()).load(user.getAvatarUrl()).into(imgAvatar);
+                        // Kiểm tra xem user có link avatar hay chưa
+                        if (user.getPhotoUrl() != null && !user.getPhotoUrl().isEmpty()) {
+                            Glide.with(requireContext())
+                                    .load(user.getPhotoUrl())
+                                    .placeholder(R.drawable.bee_pollen) // Ảnh chờ khi đang tải mạng
+                                    .error(R.drawable.bee_pollen)       // Ảnh thay thế nếu link bị lỗi
+                                    .into(imgAvatar);
+                        } else {
+                            // Nếu tài khoản chưa cài avatar, set thẳng ảnh mặc định
+                            imgAvatar.setImageResource(R.drawable.bee_pollen);
+                        }
                     }
                 }
 

@@ -21,7 +21,6 @@ public class AccountAdapter extends RecyclerView.Adapter<AccountAdapter.AccountV
 
     public interface OnAccountClickListener {
         void onAccountClick(SavedAccount account);
-        void onAddAccountClick();
     }
 
     private final List<SavedAccount> accounts;
@@ -54,7 +53,7 @@ public class AccountAdapter extends RecyclerView.Adapter<AccountAdapter.AccountV
                 TextUtils.isEmpty(account.getDisplayName()) ? "User" : account.getDisplayName());
         holder.txtEmail.setText(
                 TextUtils.isEmpty(account.getEmail()) ? "" : account.getEmail());
-
+        //set avatar
         if (!TextUtils.isEmpty(account.getPhotoUrl())) {
             Glide.with(holder.itemView.getContext())
                     .load(account.getPhotoUrl())
@@ -66,17 +65,23 @@ public class AccountAdapter extends RecyclerView.Adapter<AccountAdapter.AccountV
         }
 
         boolean isCurrent = account.getUid() != null && account.getUid().equals(currentUid);
-        holder.imgAddAccount.setVisibility(isCurrent ? View.GONE : View.VISIBLE);
+        if (isCurrent) {
+            // Nếu là tài khoản đang đăng nhập -> Hiện dấu tick
+            holder.imgShowAccount.setVisibility(View.VISIBLE);
+            holder.imgShowAccount.setImageResource(R.drawable.checkbox_terms_mark);
 
+            // Hủy sự kiện click vào dấu tick vì nó chỉ là icon báo hiệu
+            holder.imgShowAccount.setOnClickListener(null);
+        } else {
+            // Nếu là tài khoản cũ -> Ẩn icon đi
+            // Dùng INVISIBLE để giữ nguyên không gian, tránh chữ bị xô lệch sang phải
+            holder.imgShowAccount.setVisibility(View.INVISIBLE);
+        }
+
+        //sự kiện bấm vào cả dòng tài khoản (để chuyển đổi)
         holder.itemView.setOnClickListener(v -> {
             if (listener != null && !isCurrent) {
                 listener.onAccountClick(account);
-            }
-        });
-
-        holder.imgAddAccount.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onAddAccountClick();
             }
         });
     }
@@ -90,14 +95,14 @@ public class AccountAdapter extends RecyclerView.Adapter<AccountAdapter.AccountV
         final ImageView imgAvatar;
         final TextView txtName;
         final TextView txtEmail;
-        final ImageView imgAddAccount;
+        final ImageView imgShowAccount;
 
         AccountViewHolder(@NonNull View itemView) {
             super(itemView);
             imgAvatar = itemView.findViewById(R.id.img_account);
             txtName = itemView.findViewById(R.id.txt_account_name);
             txtEmail = itemView.findViewById(R.id.txt_Email);
-            imgAddAccount = itemView.findViewById(R.id.img_add_account);
+            imgShowAccount = itemView.findViewById(R.id.img_show_account);
         }
     }
 }
