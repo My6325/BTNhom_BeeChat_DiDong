@@ -63,4 +63,5 @@
     <string name="password_mismatch">Mật khẩu xác nhận không khớp.</string>
     <string name="new_password_same_as_old">Mật khẩu mới phải khác mật khẩu hiện tại.</string>
     <string name="menu_change_password">Đổi mật khẩu</string>
+    <string name="menu_exit_account">Đăng xuất</string>
 </resources>

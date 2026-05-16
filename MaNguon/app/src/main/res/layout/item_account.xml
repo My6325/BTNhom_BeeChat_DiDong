@@ -49,8 +49,8 @@
     </LinearLayout>
 
     <ImageView
-        android:id="@+id/img_add_account"
+        android:id="@+id/img_show_account"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:src="@drawable/new_accout" />
+        android:src="@drawable/checkbox_terms_mark" />
 </LinearLayout>

@@ -37,6 +37,23 @@ public class LoginActivity extends AppCompatActivity {
         
         initViews();
         event();
+
+        //Lấy Intent được truyền từ SettingsFragment sang
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("SWITCH_ACCOUNT_EMAIL")) {
+            String savedEmail = intent.getStringExtra("SWITCH_ACCOUNT_EMAIL");
+
+            //Điền email vào ô nhập liệu
+            if (edtEmail != null) {
+                edtEmail.setText(savedEmail);
+            }
+
+            // Tự động chuyển con trỏ chuột (Focus) sang ô Mật khẩu để người dùng tiện nhập
+            if (edtPassWord != null) {
+                edtPassWord.requestFocus();
+            }
+        }
+
     }
     private void initViews()
     {
