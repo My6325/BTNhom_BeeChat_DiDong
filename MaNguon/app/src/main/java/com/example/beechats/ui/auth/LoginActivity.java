@@ -9,7 +9,10 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.beechats.R;
+import com.example.beechats.data.local.SavedAccountManager;
+import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.FirebaseAuthRepository;
+import com.example.beechats.data.repositories.UserRepository;
 import com.example.beechats.ui.main.MainActivity;
 import com.example.beechats.ui.onboarding.ForgetPassword;
 import com.example.beechats.ui.onboarding.Register_Activity;
@@ -73,9 +76,9 @@ public class LoginActivity extends AppCompatActivity {
                 authRepository.login(email, password, new FirebaseAuthRepository.OnAuthCallback() {
                     @Override
                     public void onSuccess() {
+                        saveCurrentAccount();
                         Toast.makeText(LoginActivity.this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
                         Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-                        // Xóa các màn hình cũ đi để không ấn back lại được màn hình login
                         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(intent);
                         finish();
@@ -109,6 +112,33 @@ public class LoginActivity extends AppCompatActivity {
                 startActivity(intent);
                 //Gọi để không có hiệu ứng mặc định
                 overridePendingTransition(0, 0);
+            }
+        });
+    }
+
+    private void saveCurrentAccount() {
+        com.google.firebase.auth.FirebaseUser user =
+                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) return;
+        String uid = user.getUid();
+
+        new UserRepository().getUser(uid, new UserRepository.OnUserCallback() {
+            @Override
+            public void onSuccess(User u) {
+                SavedAccountManager.saveAccount(LoginActivity.this,
+                        uid,
+                        u != null ? u.getDisplayName() : user.getDisplayName(),
+                        u != null ? u.getEmail() : user.getEmail(),
+                        u != null ? u.getPhotoUrl() : null);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                SavedAccountManager.saveAccount(LoginActivity.this,
+                        uid,
+                        user.getDisplayName(),
+                        user.getEmail(),
+                        null);
             }
         });
     }

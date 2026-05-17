@@ -1,14 +1,16 @@
 package com.example.beechats.ui.chat;
 
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.example.beechats.R;
 import com.example.beechats.data.models.Message;
 import com.google.android.material.imageview.ShapeableImageView;
@@ -132,42 +134,58 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     static class SentMessageViewHolder extends RecyclerView.ViewHolder {
         private final TextView tvMessage;
+        private final ImageView imgMessage;
         private final TextView tvStatusText;
         private final ShapeableImageView imgReadAvatar;
 
         public SentMessageViewHolder(@NonNull View itemView) {
             super(itemView);
             tvMessage = itemView.findViewById(R.id.tvMessage);
+            imgMessage = itemView.findViewById(R.id.imgMessage);
             tvStatusText = itemView.findViewById(R.id.tvStatusText);
             imgReadAvatar = itemView.findViewById(R.id.imgReadAvatar);
         }
 
         public void bind(Message message, boolean isRead, boolean showAvatar) {
             if (message.isRecalled()) {
-                tvMessage.setText("Tin nhắn đã thu hồi");
-                tvMessage.setAlpha(0.5f);
-                tvMessage.setTextColor(Color.parseColor("#888888"));
+                showText("Tin nhắn đã thu hồi");
                 tvStatusText.setVisibility(View.GONE);
                 imgReadAvatar.setVisibility(View.GONE);
                 return;
             }
 
-            tvMessage.setText(message.getText());
-            tvMessage.setAlpha(1.0f);
+            if ("image".equals(message.getType()) && message.getMediaUrl() != null) {
+                showImage(message.getMediaUrl());
+            } else {
+                showText(message.getText());
+            }
 
             if (showAvatar && isRead) {
-                // Tin nhắn cuối cùng được đọc → hiện avatar người nhận
                 tvStatusText.setVisibility(View.GONE);
                 imgReadAvatar.setVisibility(View.VISIBLE);
             } else if (!isRead) {
-                // Chưa đọc → hiện "Đã gửi"
                 tvStatusText.setVisibility(View.VISIBLE);
                 imgReadAvatar.setVisibility(View.GONE);
             } else {
-                // Đã đọc nhưng không phải tin cuối cùng → ẩn cả hai
                 tvStatusText.setVisibility(View.GONE);
                 imgReadAvatar.setVisibility(View.GONE);
             }
+        }
+
+        private void showText(String text) {
+            tvMessage.setVisibility(View.VISIBLE);
+            imgMessage.setVisibility(View.GONE);
+            tvMessage.setText(text != null ? text : "");
+            tvMessage.setAlpha(1.0f);
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
+        }
+
+        private void showImage(String url) {
+            tvMessage.setVisibility(View.GONE);
+            imgMessage.setVisibility(View.VISIBLE);
+            Glide.with(itemView.getContext())
+                    .load(url)
+                    .into(imgMessage);
         }
     }
 
@@ -175,21 +193,36 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     static class ReceivedMessageViewHolder extends RecyclerView.ViewHolder {
         private final TextView txtMessage;
+        private final ImageView imgMessage;
 
         public ReceivedMessageViewHolder(@NonNull View itemView) {
             super(itemView);
             txtMessage = itemView.findViewById(R.id.txtMessage);
+            imgMessage = itemView.findViewById(R.id.imgMessage);
         }
 
         public void bind(Message message, boolean isRead) {
             if (message.isRecalled()) {
+                txtMessage.setVisibility(View.VISIBLE);
+                imgMessage.setVisibility(View.GONE);
                 txtMessage.setText("Tin nhắn đã thu hồi");
                 txtMessage.setAlpha(0.5f);
-                txtMessage.setTextColor(Color.parseColor("#888888"));
+                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.gray_dam));
+                return;
+            }
+
+            if ("image".equals(message.getType()) && message.getMediaUrl() != null) {
+                txtMessage.setVisibility(View.GONE);
+                imgMessage.setVisibility(View.VISIBLE);
+                Glide.with(itemView.getContext())
+                        .load(message.getMediaUrl())
+                        .into(imgMessage);
             } else {
+                txtMessage.setVisibility(View.VISIBLE);
+                imgMessage.setVisibility(View.GONE);
                 txtMessage.setText(message.getText());
                 txtMessage.setAlpha(1.0f);
-                txtMessage.setTextColor(Color.parseColor("#000000"));
+                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
             }
         }
     }

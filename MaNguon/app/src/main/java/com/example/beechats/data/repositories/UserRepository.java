@@ -164,6 +164,25 @@ public class UserRepository {
     }
 
     /**
+     * Cập nhật chỉ {@code settings.darkMode} (không ghi đè toàn bộ object settings).
+     */
+    public void updateDarkMode(String userId, boolean darkMode, OnCompleteCallback callback) {
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("settings.darkMode", darkMode);
+        updates.put("updatedAt", FieldValue.serverTimestamp());
+
+        db.collection(COLLECTION)
+                .document(userId.trim())
+                .update(updates)
+                .addOnSuccessListener(unused -> callback.onSuccess())
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    /**
      * Lưu FCM token vào Firestore để nhận push notification.
      * Gọi sau khi đăng nhập thành công và khi token được làm mới.
      *

@@ -1,9 +1,11 @@
 package com.example.beechats.ui.setting;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -16,10 +18,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.beechats.R;
+import com.example.beechats.data.local.SavedAccountManager;
+import com.example.beechats.data.models.SavedAccount;
 import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.UserRepository;
+import com.example.beechats.ui.auth.LoginActivity;
+import com.example.beechats.ui.onboarding.QRCode_Activity;
+import com.example.beechats.utils.ThemeHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+
+import java.util.List;
 
 public class SettingsFragment extends Fragment {
 
@@ -29,6 +38,33 @@ public class SettingsFragment extends Fragment {
     private RecyclerView rvAccount;
     private UserRepository userRepository;
     private FirebaseAuth mAuth;
+
+    private final CompoundButton.OnCheckedChangeListener darkModeListener =
+            (buttonView, isChecked) -> {
+                ThemeHelper.savePendingBottomNavItem(requireContext(), R.id.menu_settings);
+                ThemeHelper.setDarkModeEnabled(requireContext(), isChecked);
+                FirebaseUser firebaseUser = mAuth.getCurrentUser();
+                if (firebaseUser == null) {
+                    return;
+                }
+                userRepository.updateDarkMode(firebaseUser.getUid(), isChecked,
+                        new UserRepository.OnCompleteCallback() {
+                            @Override
+                            public void onSuccess() { }
+
+                            @Override
+                            public void onError(String errorMessage) {
+                                if (!isAdded()) {
+                                    return;
+                                }
+                                Toast.makeText(getContext(),
+                                        getString(R.string.dark_mode_save_error, errorMessage),
+                                        Toast.LENGTH_SHORT).show();
+                                setDarkSwitchWithoutEvent(!isChecked);
+                                ThemeHelper.setDarkModeEnabled(requireContext(), !isChecked);
+                            }
+                        });
+            };
 
     @Nullable
     @Override
@@ -43,15 +79,40 @@ public class SettingsFragment extends Fragment {
         switchStatus = view.findViewById(R.id.switch_status);
         rvAccount = view.findViewById(R.id.rv_Account);
 
+        view.findViewById(R.id.btn_menu_qr).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), QRCode_Activity.class)));
+
+        view.findViewById(R.id.row_change_password).setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), ChangePasswordActivity.class)));
+
         // Khởi tạo Repository và Auth
         userRepository = new UserRepository();
         mAuth = FirebaseAuth.getInstance();
 
-        // Thiết lập RecyclerView cho danh sách tài khoản
+        setDarkSwitchWithoutEvent(ThemeHelper.getStoredDarkMode(requireContext()));
+        switchDarkMode.setOnCheckedChangeListener(darkModeListener);
+
         rvAccount.setLayoutManager(new LinearLayoutManager(getContext()));
-        // TODO: Cài đặt Adapter cho recyclerAccount nếu cần thiết
+        loadSavedAccounts();
         loadUserProfile();
+        // Thiết lập RecyclerView cho danh sách tài khoản
         return view;
+    }
+
+    private void loadSavedAccounts() {
+        List<SavedAccount> accounts = SavedAccountManager.getSavedAccounts(requireContext());
+        AccountAdapter adapter = new AccountAdapter(accounts, new AccountAdapter.OnAccountClickListener() {
+            @Override
+            public void onAccountClick(SavedAccount account) {
+                // TODO: chuyển đổi tài khoản nếu cần
+            }
+
+            @Override
+            public void onAddAccountClick() {
+                startActivity(new Intent(requireContext(), LoginActivity.class));
+            }
+        });
+        rvAccount.setAdapter(adapter);
     }
 
     private void loadUserProfile() {
@@ -68,6 +129,13 @@ public class SettingsFragment extends Fragment {
                         txtEmail.setText(user.getEmail());
                         // load avatar if using Glide/Picasso
                         // Glide.with(getContext()).load(user.getAvatarUrl()).into(imgAvatar);
+
+                        boolean darkFromCloud = user.getSettings() != null
+                                && user.getSettings().isDarkMode();
+                        if (ThemeHelper.getStoredDarkMode(requireContext()) != darkFromCloud) {
+                            ThemeHelper.setDarkModeEnabled(requireContext(), darkFromCloud);
+                        }
+                        setDarkSwitchWithoutEvent(darkFromCloud);
                     }
                 }
 
@@ -79,5 +147,11 @@ public class SettingsFragment extends Fragment {
                 }
             });
         }
+    }
+
+    private void setDarkSwitchWithoutEvent(boolean checked) {
+        switchDarkMode.setOnCheckedChangeListener(null);
+        switchDarkMode.setChecked(checked);
+        switchDarkMode.setOnCheckedChangeListener(darkModeListener);
     }
 }
