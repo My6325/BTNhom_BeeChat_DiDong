@@ -101,6 +101,27 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------
+    // Collection: call_sessions/{callId}
+    // ----------------------------------------------------------------
+    // - Người tạo và người nhận được đọc / cập nhật session cuộc gọi của mình
+    // - Tạo mới: caller phải là auth user hiện tại
+    // - Cập nhật trạng thái: caller hoặc callee đều có thể cập nhật
+    // ----------------------------------------------------------------
+    match /call_sessions/{callId} {
+      allow read: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.callerId ||
+                     request.auth.uid == resource.data.calleeId);
+      allow create: if isAuthenticated() &&
+                       request.auth.uid == request.resource.data.callerId;
+      allow update: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.callerId ||
+                        request.auth.uid == resource.data.calleeId);
+      allow delete: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.callerId ||
+                        request.auth.uid == resource.data.calleeId);
+    }
+
+    // ----------------------------------------------------------------
     // Collection: friendRequests/{requestId}
     // ----------------------------------------------------------------
     // - Chỉ sender hoặc receiver đọc request của mình

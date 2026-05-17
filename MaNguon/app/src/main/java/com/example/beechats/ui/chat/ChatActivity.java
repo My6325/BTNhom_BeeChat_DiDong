@@ -26,6 +26,7 @@ import com.example.beechats.R;
 import com.example.beechats.data.models.CallSession;
 import com.example.beechats.data.models.Message;
 import com.example.beechats.data.repositories.CallRepository;
+import com.example.beechats.data.repositories.CallRepository;
 import com.example.beechats.data.repositories.MessageRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -240,14 +241,31 @@ public class ChatActivity extends AppCompatActivity {
             callId = UUID.randomUUID().toString().replace("-", "_");
         }
 
-        Intent intent = new Intent(this, com.example.beechats.ui.call.CallActivity.class);
-        intent.putExtra(com.example.beechats.ui.call.CallActivity.EXTRA_CALL_ID, callId);
-        intent.putExtra(com.example.beechats.ui.call.CallActivity.EXTRA_USER_ID, currentUserId);
-        intent.putExtra(com.example.beechats.ui.call.CallActivity.EXTRA_USER_NAME, currentUserName);
-        intent.putExtra(com.example.beechats.ui.call.CallActivity.EXTRA_CALL_TYPE, callType);
-        intent.putExtra("receiver_id", receiverId);
-        intent.putExtra("receiver_name", receiverName);
-        startActivity(intent);
+        callRepository.createOutgoingCall(
+                currentUserId,
+                currentUserName,
+                receiverId,
+                receiverName,
+                callType,
+                new CallRepository.OnCallSessionCallback() {
+                    @Override
+                    public void onSuccess(com.example.beechats.data.models.CallSession callSession) {
+                        Intent intent = new Intent(ChatActivity.this, com.example.beechats.ui.call.OutgoingCallWaitingActivity.class);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_CALL_ID, callSession.getCallId());
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_USER_ID, currentUserId);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_USER_NAME, currentUserName);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_CALL_TYPE, callType);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_PEER_ID, receiverId);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_PEER_NAME, receiverName);
+                        startActivity(intent);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        Toast.makeText(ChatActivity.this, message, Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
     }
 
     private void sendImageMessage(String imageUrl) {

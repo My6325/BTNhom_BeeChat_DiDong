@@ -53,6 +53,7 @@
             android:name=".ui.onboarding.ScanQrActivity" android:exported="false" android:theme="@style/Theme.BeeChats.ScanQr" />
         <!-- Màn hình Chat -->
         <activity android:name=".ui.chat.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.call.OutgoingCallWaitingActivity" android:exported="false" />
         <activity android:name=".ui.call.CallActivity" android:exported="false" />
 
         <activity android:name=".ui.setting.ChangePasswordActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
