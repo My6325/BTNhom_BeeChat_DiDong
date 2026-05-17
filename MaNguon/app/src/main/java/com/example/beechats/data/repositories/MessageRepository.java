@@ -48,15 +48,25 @@ public class MessageRepository {
     /**
      * Gửi tin nhắn text vào hội thoại và cập nhật cache lastMessage trong conversation document.
      * Dùng WriteBatch để đảm bảo atomic: cả hai thao tác thành công hoặc cùng thất bại.
-     *
-     * @param conversationId ID hội thoại (không được rỗng)
-     * @param senderId       UID người gửi (không được rỗng)
-     * @param senderName     Tên người gửi
-     * @param text           Nội dung tin nhắn (không được rỗng)
-     * @param callback       Kết quả trả về (onSuccess với messageId, hoặc onError)
      */
     public void sendMessage(String conversationId, String senderId, String senderName,
                             String text, OnSendMessageCallback callback) {
+        sendMessageInternal(conversationId, senderId, senderName, "text", text, null, null, null, callback);
+    }
+
+    /**
+     * Gửi tin nhắn media vào hội thoại và cập nhật cache lastMessage trong conversation document.
+     */
+    public void sendMediaMessage(String conversationId, String senderId, String senderName,
+                                 String type, String mediaUrl, String thumbnailUrl,
+                                 Long mediaDuration, OnSendMessageCallback callback) {
+        sendMessageInternal(conversationId, senderId, senderName, type, null, mediaUrl, thumbnailUrl, mediaDuration, callback);
+    }
+
+    private void sendMessageInternal(String conversationId, String senderId, String senderName,
+                                     String type, String text, String mediaUrl,
+                                     String thumbnailUrl, Long mediaDuration,
+                                     OnSendMessageCallback callback) {
         if (conversationId == null || conversationId.trim().isEmpty()) {
             callback.onError("ID hội thoại không hợp lệ.");
             return;
@@ -65,12 +75,16 @@ public class MessageRepository {
             callback.onError("ID người gửi không hợp lệ.");
             return;
         }
-        if (text == null || text.trim().isEmpty()) {
-            callback.onError("Nội dung tin nhắn không được để trống.");
+        if (type == null || type.trim().isEmpty()) {
+            callback.onError("Loại tin nhắn không hợp lệ.");
+            return;
+        }
+        if (("text".equals(type) && (text == null || text.trim().isEmpty()))
+                || (!"text".equals(type) && (mediaUrl == null || mediaUrl.trim().isEmpty()))) {
+            callback.onError("Thiếu dữ liệu tin nhắn.");
             return;
         }
 
-        // Tạo auto-ID cho message document mới
         DocumentReference msgRef = db.collection(CONV_COLLECTION)
                 .document(conversationId)
                 .collection(MSG_SUBCOLLECTION)
@@ -79,37 +93,55 @@ public class MessageRepository {
         DocumentReference convRef = db.collection(CONV_COLLECTION)
                 .document(conversationId);
 
-        // Dữ liệu message document
         Map<String, Object> msgData = new HashMap<>();
         msgData.put("senderId", senderId.trim());
         msgData.put("senderName", senderName != null ? senderName : "");
-        msgData.put("text", text.trim());
-        msgData.put("type", "text");
+        msgData.put("type", type.trim());
         msgData.put("status", "sent");
         msgData.put("createdAt", FieldValue.serverTimestamp());
         msgData.put("updatedAt", FieldValue.serverTimestamp());
 
-        // Cache lastMessage trong conversation document
+        if ("text".equals(type)) {
+            msgData.put("text", text.trim());
+        } else {
+            msgData.put("mediaUrl", mediaUrl.trim());
+            msgData.put("text", "");
+            if (thumbnailUrl != null && !thumbnailUrl.trim().isEmpty()) {
+                msgData.put("mediaThumbnailUrl", thumbnailUrl.trim());
+            }
+            if (mediaDuration != null) {
+                msgData.put("mediaDuration", mediaDuration);
+            }
+        }
+
         Map<String, Object> lastMessage = new HashMap<>();
-        lastMessage.put("text", text.trim());
         lastMessage.put("senderId", senderId.trim());
         lastMessage.put("senderName", senderName != null ? senderName : "");
-        lastMessage.put("type", "text");
+        lastMessage.put("type", type.trim());
         lastMessage.put("timestamp", FieldValue.serverTimestamp());
+        lastMessage.put("content", "text".equals(type) ? text.trim() : getPreviewText(type));
+        if (!"text".equals(type)) {
+            lastMessage.put("mediaUrl", mediaUrl.trim());
+        }
 
         Map<String, Object> convUpdate = new HashMap<>();
         convUpdate.put("lastMessage", lastMessage);
         convUpdate.put("updatedAt", FieldValue.serverTimestamp());
 
-        // Atomic WriteBatch: tạo message + cập nhật conversation
+        String messageId = msgRef.getId();
         WriteBatch batch = db.batch();
         batch.set(msgRef, msgData);
         batch.update(convRef, convUpdate);
-
-        String messageId = msgRef.getId();
         batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(messageId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    private String getPreviewText(String type) {
+        if ("image".equals(type)) return "Đã gửi một ảnh";
+        if ("video".equals(type)) return "Đã gửi một video";
+        if ("audio".equals(type)) return "Đã gửi một tin nhắn thoại";
+        return "Đã gửi một tệp";
     }
 
     /**

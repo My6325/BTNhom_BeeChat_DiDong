@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.beechats"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -45,6 +45,7 @@ android {
 dependencies {
 
     implementation(libs.appcompat)
+    implementation(libs.firebase.functions)
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
@@ -62,4 +63,7 @@ dependencies {
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0") // Cho Glide annotation processing
     // ProcessLifecycleOwner — theo dõi foreground/background của toàn bộ app
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
+
+    implementation ("im.zego:zego_uikit_prebuilt_call_android:+")
+
 }
