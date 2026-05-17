@@ -14,6 +14,9 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        buildConfigField("String", "ZEGO_APP_ID", "\"1302184408\"")
+        buildConfigField("String", "ZEGO_APP_SIGN", "\"0026ffba220be64439be30a172f10dd4566cbfbdd1d560aac0fc283e23149799\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -33,6 +36,7 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
     testOptions {
         unitTests {
             // Cho phép android.util.Log và các Android SDK stub trả default value
@@ -63,7 +67,6 @@ dependencies {
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0") // Cho Glide annotation processing
     // ProcessLifecycleOwner — theo dõi foreground/background của toàn bộ app
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
-
-    implementation ("im.zego:zego_uikit_prebuilt_call_android:+")
-
+    // ZEGOCLOUD - Gọi thoại và video
+    implementation("im.zego:zego_uikit_prebuilt_call_android:+")
 }
