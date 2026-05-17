@@ -10,6 +10,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
@@ -23,6 +26,7 @@ import com.example.beechats.R;
 import com.example.beechats.data.models.CallSession;
 import com.example.beechats.data.models.Message;
 import com.example.beechats.data.repositories.CallRepository;
+import com.example.beechats.data.repositories.CallRepository;
 import com.example.beechats.data.repositories.MessageRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -31,9 +35,8 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 
 public class ChatActivity extends AppCompatActivity {
 
@@ -50,6 +53,8 @@ public class ChatActivity extends AppCompatActivity {
     private EditText editMessage;
     private ImageView btnSend;
     private ImageView btnPickImage;
+    private ImageView btnVoiceCall;
+    private ImageView btnVideoCall;
     private ImageView btnBack;
     private TextView txtName;
 
@@ -111,6 +116,8 @@ public class ChatActivity extends AppCompatActivity {
         editMessage = findViewById(R.id.editMessage);
         btnSend = findViewById(R.id.btnSend);
         btnPickImage = findViewById(R.id.btnPickImage);
+        btnVoiceCall = findViewById(R.id.btnVoiceCall);
+        btnVideoCall = findViewById(R.id.btnVideoCall);
         btnBack = findViewById(R.id.btnBack);
         txtName = findViewById(R.id.txtName);
     }
@@ -136,11 +143,8 @@ public class ChatActivity extends AppCompatActivity {
         });
 
         btnPickImage.setOnClickListener(v -> pickImageLauncher.launch("image/*"));
-
-        ImageView btnVideoCall = findViewById(R.id.img_telephone);
-        if (btnVideoCall != null) {
-            btnVideoCall.setOnClickListener(v -> startVideoCall());
-        }
+        btnVoiceCall.setOnClickListener(v -> startZegoCall("voice"));
+        btnVideoCall.setOnClickListener(v -> startZegoCall("video"));
     }
 
     private void setupImagePicker() {
@@ -226,31 +230,33 @@ public class ChatActivity extends AppCompatActivity {
         return -1;
     }
 
-    private void startVideoCall() {
-        if (TextUtils.isEmpty(currentUserId) || TextUtils.isEmpty(conversationId)) {
+    private void startZegoCall(String callType) {
+        if (TextUtils.isEmpty(currentUserId) || TextUtils.isEmpty(receiverId)) {
             Toast.makeText(this, "Không thể bắt đầu cuộc gọi", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String displayReceiverName = receiverName != null ? receiverName : (txtName != null ? txtName.getText().toString() : "");
-        String calleeId = TextUtils.isEmpty(receiverId) ? conversationId : receiverId;
+        String callId = conversationId;
+        if (TextUtils.isEmpty(callId)) {
+            callId = UUID.randomUUID().toString().replace("-", "_");
+        }
+
         callRepository.createOutgoingCall(
                 currentUserId,
                 currentUserName,
-                calleeId,
-                displayReceiverName,
-                "video",
+                receiverId,
+                receiverName,
+                callType,
                 new CallRepository.OnCallSessionCallback() {
                     @Override
-                    public void onSuccess(CallSession callSession) {
-                        Intent intent = new Intent(ChatActivity.this, com.example.beechats.ui.call.VideoCallActivity.class);
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALL_ID, callSession.getCallId());
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_ROOM_ID, callSession.getRoomId());
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALL_TYPE, callSession.getType());
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLER_ID, callSession.getCallerId());
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLEE_ID, callSession.getCalleeId());
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLER_NAME, callSession.getCallerName());
-                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLEE_NAME, callSession.getCalleeName());
+                    public void onSuccess(com.example.beechats.data.models.CallSession callSession) {
+                        Intent intent = new Intent(ChatActivity.this, com.example.beechats.ui.call.OutgoingCallWaitingActivity.class);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_CALL_ID, callSession.getCallId());
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_USER_ID, currentUserId);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_USER_NAME, currentUserName);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_CALL_TYPE, callType);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_PEER_ID, receiverId);
+                        intent.putExtra(com.example.beechats.ui.call.OutgoingCallWaitingActivity.EXTRA_PEER_NAME, receiverName);
                         startActivity(intent);
                     }
 

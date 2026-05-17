@@ -135,7 +135,7 @@ public class SettingsFragment extends Fragment {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             String uid = currentUser.getUid();
-            
+
             // Lấy dữ liệu từ Firestore thông qua UserRepository
             userRepository.getUser(uid, new UserRepository.OnUserCallback() {
                 @Override
@@ -143,7 +143,6 @@ public class SettingsFragment extends Fragment {
                     if (isAdded()) { // Kiểm tra Fragment còn gắn vào Activity không
                         txtName.setText(user.getDisplayName());
                         txtEmail.setText(user.getEmail());
-<<<<<<< HEAD
                         // load avatar if using Glide/Picasso
                         // Glide.with(getContext()).load(user.getAvatarUrl()).into(imgAvatar);
 
@@ -153,7 +152,6 @@ public class SettingsFragment extends Fragment {
                             ThemeHelper.setDarkModeEnabled(requireContext(), darkFromCloud);
                         }
                         setDarkSwitchWithoutEvent(darkFromCloud);
-=======
                         // Kiểm tra xem user có link avatar hay chưa
                         if (user.getPhotoUrl() != null && !user.getPhotoUrl().isEmpty()) {
                             Glide.with(requireContext())
@@ -165,7 +163,6 @@ public class SettingsFragment extends Fragment {
                             // Nếu tài khoản chưa cài avatar, set thẳng ảnh mặc định
                             imgAvatar.setImageResource(R.drawable.bee_pollen);
                         }
->>>>>>> feature/chat-ui
                     }
                 }
 

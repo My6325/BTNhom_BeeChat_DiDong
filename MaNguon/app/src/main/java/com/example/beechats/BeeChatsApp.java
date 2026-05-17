@@ -11,14 +11,20 @@ import com.example.beechats.utils.AppLifecycleObserver;
 import com.example.beechats.utils.ThemeHelper;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Application class chính của BeeChat.
- * Khởi tạo Firebase và Cloudinary khi app bắt đầu.
+ * Khởi tạo Firebase, Cloudinary và Zego khi app bắt đầu.
  */
 public class BeeChatsApp extends Application {
+    private static final String TAG = "BeeChatsApp";
+    private boolean isZegoServiceStarted = false;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -26,6 +32,7 @@ public class BeeChatsApp extends Application {
         FirebaseApp.initializeApp(this);
         registerLifecycleObserver();
         initCloudinary();
+        initZegoIfUserLoggedIn();
     }
 
     /**
@@ -45,61 +52,48 @@ public class BeeChatsApp extends Application {
         MediaManager.init(this, config);
     }
 
-    private void initZegoCallUIKit() {
-        if (ZEGOCLOUD_APP_ID <= 0) {
-            Log.w(TAG, "ZEGOCLOUD_APP_ID chưa được cấu hình, bỏ qua init Zego Call UIKit");
+    public void initZegoIfUserLoggedIn() {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Log.d(TAG, "Chưa có user đăng nhập, bỏ qua khởi tạo Zego");
             return;
         }
 
-        ZegoTokenProvider provider = new ZegoTokenProvider() {
-            @Override
-            public void getToken(String userID, ZegoTokenCallback callback) {
-                getTokenFromCloudFunction(userID, 24 * 60 * 60, callback);
-            }
-        };
+        if (isZegoServiceStarted) {
+            return;
+        }
 
-        ZegoCallManager.getInstance().init(ZEGOCLOUD_APP_ID, this, provider);
-    }
+        String appId = BuildConfig.ZEGO_APP_ID;
+        String appSign = BuildConfig.ZEGO_APP_SIGN;
+        if (appId == null || appId.trim().isEmpty() || appSign == null || appSign.trim().isEmpty()) {
+            Log.w(TAG, "Thiếu ZEGO_APP_ID hoặc ZEGO_APP_SIGN, không thể khởi tạo Zego service");
+            return;
+        }
 
-    private void getTokenFromCloudFunction(String userID, long effectiveTime, ZegoTokenCallback callback) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("id", userID);
-        data.put("effective_time", effectiveTime);
+        String userId = user.getUid();
+        String userName = user.getDisplayName() != null ? user.getDisplayName() : user.getEmail();
+        if (userName == null || userName.trim().isEmpty()) {
+            userName = userId;
+        }
 
-        FirebaseFunctions.getInstance().getHttpsCallable("getToken")
-                .call(data)
-                .continueWith(task -> task.getResult().getData())
-                .addOnCompleteListener(task -> {
-                    if (!task.isSuccessful()) {
-                        Exception e = task.getException();
-                        if (e instanceof FirebaseFunctionsException) {
-                            FirebaseFunctionsException ffe = (FirebaseFunctionsException) e;
-                            Log.e(TAG, "FirebaseFunctions error: " + ffe.getCode() + ", details=" + ffe.getDetails());
-                        } else if (e != null) {
-                            Log.e(TAG, "Không lấy được Zego token: " + e.getMessage(), e);
-                        }
-                        callback.onTokenCallback(-1, null);
-                        return;
-                    }
+        try {
+            Class<?> serviceClass = Class.forName("com.zegocloud.uikit.prebuilt.call.invitation.ZegoUIKitPrebuiltCallInvitationService");
+            Method initMethod = serviceClass.getMethod(
+                    "init",
+                    Application.class,
+                    long.class,
+                    String.class,
+                    String.class,
+                    String.class,
+                    String.class,
+                    Object.class
+            );
 
-                    Object resultData = task.getResult().getData();
-                    if (!(resultData instanceof Map)) {
-                        Log.e(TAG, "Token response không hợp lệ");
-                        callback.onTokenCallback(-1, null);
-                        return;
-                    }
-
-                    Map<?, ?> result = (Map<?, ?>) resultData;
-                    Object tokenObj = result.get("token");
-                    String token = tokenObj != null ? tokenObj.toString() : null;
-                    if (token == null || token.isEmpty()) {
-                        Log.e(TAG, "Token rỗng từ Cloud Function");
-                        callback.onTokenCallback(-1, null);
-                        return;
-                    }
-
-                    Log.d(TAG, "Nhận Zego token thành công");
-                    callback.onTokenCallback(0, token);
-                });
+            long parsedAppId = Long.parseLong(appId.trim());
+            initMethod.invoke(null, this, parsedAppId, appSign.trim(), userId, userName, null, null);
+            isZegoServiceStarted = true;
+        } catch (Exception e) {
+            Log.e(TAG, "Không thể khởi tạo Zego call invitation service", e);
+        }
     }
 }

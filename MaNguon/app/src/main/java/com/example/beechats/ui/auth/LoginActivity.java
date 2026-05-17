@@ -21,6 +21,8 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.google.firebase.auth.FirebaseAuth;
+
 public class LoginActivity extends AppCompatActivity {
     private Button btnRegister, btnLogin;
     private TextView txtForgetPass;
@@ -94,6 +96,8 @@ public class LoginActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess() {
                         saveCurrentAccount();
+                        updateOnlineStatusInBackground();
+                        ((com.example.beechats.BeeChatsApp) getApplication()).initZegoIfUserLoggedIn();
                         Toast.makeText(LoginActivity.this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
                         Intent intent = new Intent(LoginActivity.this, MainActivity.class);
                         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -135,7 +139,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private void saveCurrentAccount() {
         com.google.firebase.auth.FirebaseUser user =
-                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+                FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) return;
         String uid = user.getUid();
 
@@ -156,6 +160,23 @@ public class LoginActivity extends AppCompatActivity {
                         user.getDisplayName(),
                         user.getEmail(),
                         null);
+            }
+        });
+    }
+
+    private void updateOnlineStatusInBackground() {
+        String uid = FirebaseAuth.getInstance().getCurrentUser() != null
+                ? FirebaseAuth.getInstance().getCurrentUser().getUid()
+                : null;
+        if (uid == null) return;
+
+        new UserRepository().updateOnlineStatus(uid, true, new UserRepository.OnCompleteCallback() {
+            @Override
+            public void onSuccess() {
+            }
+
+            @Override
+            public void onError(String errorMessage) {
             }
         });
     }
