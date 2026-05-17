@@ -36,16 +36,26 @@
             app:layout_constraintStart_toEndOf="@id/btnBack"
             app:layout_constraintTop_toTopOf="parent" />
 
+
         <ImageView
-            android:id="@+id/img_telephone"
+            android:id="@+id/btnVoiceCall"
             android:layout_width="35dp"
             android:layout_height="35dp"
-            android:src="@drawable/telephone"
-            android:padding="3dp"
             android:layout_marginEnd="10dp"
+            android:src="@drawable/telephone"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/img_chat_setting"
-            app:layout_constraintTop_toTopOf="parent"/>
+            app:layout_constraintEnd_toStartOf="@id/btnVideoCall"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/btnVideoCall"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginEnd="10dp"
+            android:src="@drawable/camera"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/img_chat_setting"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <ImageView
             android:id="@+id/img_chat_setting"
