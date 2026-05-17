@@ -43,7 +43,10 @@ public class CallActivity extends AppCompatActivity {
         }
 
         try {
-            Class<?> configClass = Class.forName("im.zego.zego_uikit.ZegoUIKitPrebuiltCallConfig");
+            Class<?> configClass = loadClass(
+                "im.zego.zego_uikit.ZegoUIKitPrebuiltCallConfig",
+                "com.zegocloud.uikit.prebuilt.call.ZegoUIKitPrebuiltCallConfig"
+            );
             Object config = configClass.getDeclaredConstructor().newInstance();
             if ("voice".equals(callType)) {
                 setBooleanField(config, "turnOnCameraWhenJoining", false);
@@ -55,26 +58,42 @@ public class CallActivity extends AppCompatActivity {
                 setBooleanField(config, "turnOnCameraWhenJoining", true);
             }
 
-            Class<?> fragmentClass = Class.forName("im.zego.zego_uikit.ZegoUIKitPrebuiltCallFragment");
+            Class<?> fragmentClass = loadClass(
+                "im.zego.zego_uikit.ZegoUIKitPrebuiltCallFragment",
+                "com.zegocloud.uikit.prebuilt.call.ZegoUIKitPrebuiltCallFragment"
+            );
             Method newInstanceMethod = fragmentClass.getMethod(
-                    "newInstance",
-                    long.class,
-                    String.class,
-                    String.class,
-                    String.class,
-                    String.class,
-                    configClass
+                "newInstance",
+                long.class,
+                String.class,
+                String.class,
+                String.class,
+                String.class,
+                configClass
             );
             Object fragment = newInstanceMethod.invoke(null, appID, appSign, userID, userName, callID, config);
             getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, (Fragment) fragment)
-                    .commitNow();
+                .replace(R.id.fragment_container, (Fragment) fragment)
+                .commitNow();
         } catch (Throwable e) {
             Log.e("CallActivity", "Cannot init Zego call UI", e);
             Toast.makeText(this, "Không thể mở màn hình cuộc gọi", Toast.LENGTH_SHORT).show();
             finish();
         }
     }
+
+    private Class<?> loadClass(String... candidates) throws ClassNotFoundException {
+        ClassNotFoundException last = null;
+        for (String name : candidates) {
+            try {
+                return Class.forName(name);
+            } catch (ClassNotFoundException e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new ClassNotFoundException("Zego class not found");
+    }
+
 
     private void setBooleanField(Object target, String fieldName, boolean value) {
         try {
