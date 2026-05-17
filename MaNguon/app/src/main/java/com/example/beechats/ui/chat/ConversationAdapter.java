@@ -151,6 +151,16 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
                 Context context = v.getContext();
                 Intent intent = new Intent(context, ChatActivity.class);
                 intent.putExtra(ChatActivity.EXTRA_CONVERSATION_ID, conversation.getConversationId());
+                String otherUserId = null;
+                if (conversation.getParticipants() != null) {
+                    for (String uid : conversation.getParticipants()) {
+                        if (!uid.equals(currentUserId)) {
+                            otherUserId = uid;
+                            break;
+                        }
+                    }
+                }
+                intent.putExtra(ChatActivity.EXTRA_RECEIVER_ID, otherUserId);
                 intent.putExtra(ChatActivity.EXTRA_RECEIVER_NAME, txtUserName.getText().toString());
                 context.startActivity(intent);
             });

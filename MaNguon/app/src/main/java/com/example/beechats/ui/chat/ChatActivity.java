@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.content.Intent;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -19,7 +20,9 @@ import com.cloudinary.android.MediaManager;
 import com.cloudinary.android.callback.ErrorInfo;
 import com.cloudinary.android.callback.UploadCallback;
 import com.example.beechats.R;
+import com.example.beechats.data.models.CallSession;
 import com.example.beechats.data.models.Message;
+import com.example.beechats.data.repositories.CallRepository;
 import com.example.beechats.data.repositories.MessageRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -38,6 +41,7 @@ public class ChatActivity extends AppCompatActivity {
 
     // Intent extras keys — dùng khi mở ChatActivity từ nơi khác
     public static final String EXTRA_CONVERSATION_ID = "conversation_id";
+    public static final String EXTRA_RECEIVER_ID = "receiver_id";
     public static final String EXTRA_RECEIVER_NAME = "receiver_name";
 
     private RecyclerView recyclerViewChat;
@@ -50,11 +54,14 @@ public class ChatActivity extends AppCompatActivity {
     private TextView txtName;
 
     private MessageRepository messageRepository;
+    private CallRepository callRepository;
     private ListenerRegistration messageListener;
     private ActivityResultLauncher<String> pickImageLauncher;
 
     private String currentUserId;
     private String currentUserName;
+    private String receiverId;
+    private String receiverName;
     private String conversationId;
 
     @Override
@@ -74,9 +81,10 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
 
-        // Lấy conversationId và tên người nhận từ Intent
+        // Lấy conversationId, receiverId và tên người nhận từ Intent
         conversationId = getIntent().getStringExtra(EXTRA_CONVERSATION_ID);
-        String receiverName = getIntent().getStringExtra(EXTRA_RECEIVER_NAME);
+        receiverId = getIntent().getStringExtra(EXTRA_RECEIVER_ID);
+        receiverName = getIntent().getStringExtra(EXTRA_RECEIVER_NAME);
 
         if (conversationId == null || conversationId.isEmpty()) {
             Toast.makeText(this, "Không tìm thấy hội thoại!", Toast.LENGTH_SHORT).show();
@@ -85,6 +93,7 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         messageRepository = new MessageRepository();
+        callRepository = new CallRepository();
 
         initViews();
         setupImagePicker();
@@ -127,6 +136,11 @@ public class ChatActivity extends AppCompatActivity {
         });
 
         btnPickImage.setOnClickListener(v -> pickImageLauncher.launch("image/*"));
+
+        ImageView btnVideoCall = findViewById(R.id.img_telephone);
+        if (btnVideoCall != null) {
+            btnVideoCall.setOnClickListener(v -> startVideoCall());
+        }
     }
 
     private void setupImagePicker() {
@@ -210,6 +224,42 @@ public class ChatActivity extends AppCompatActivity {
             Log.e(TAG, "Không đọc được kích thước file", e);
         }
         return -1;
+    }
+
+    private void startVideoCall() {
+        if (TextUtils.isEmpty(currentUserId) || TextUtils.isEmpty(conversationId)) {
+            Toast.makeText(this, "Không thể bắt đầu cuộc gọi", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String displayReceiverName = receiverName != null ? receiverName : (txtName != null ? txtName.getText().toString() : "");
+        String calleeId = TextUtils.isEmpty(receiverId) ? conversationId : receiverId;
+        callRepository.createOutgoingCall(
+                currentUserId,
+                currentUserName,
+                calleeId,
+                displayReceiverName,
+                "video",
+                new CallRepository.OnCallSessionCallback() {
+                    @Override
+                    public void onSuccess(CallSession callSession) {
+                        Intent intent = new Intent(ChatActivity.this, com.example.beechats.ui.call.VideoCallActivity.class);
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALL_ID, callSession.getCallId());
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_ROOM_ID, callSession.getRoomId());
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALL_TYPE, callSession.getType());
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLER_ID, callSession.getCallerId());
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLEE_ID, callSession.getCalleeId());
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLER_NAME, callSession.getCallerName());
+                        intent.putExtra(com.example.beechats.ui.call.VideoCallActivity.EXTRA_CALLEE_NAME, callSession.getCalleeName());
+                        startActivity(intent);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        Toast.makeText(ChatActivity.this, message, Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
     }
 
     private void sendImageMessage(String imageUrl) {
