@@ -33,7 +33,6 @@ import com.example.beechats.data.repositories.MessageRepository;
 import com.example.beechats.data.repositories.UserRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.io.FileNotFoundException;
@@ -67,6 +66,9 @@ public class ChatActivity extends AppCompatActivity {
     private ListenerRegistration messageListener;
     private ActivityResultLauncher<String> pickMediaLauncher;
     private ProgressDialog uploadProgressDialog;
+
+    private boolean isMarkingAsRead = false;
+    private String lastMarkedReadMessageId;
 
     private String currentUserId;
     private String currentUserName;
@@ -428,21 +430,22 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
-    private boolean hasUnreadIncomingMessage(List<Message> messages) {
+    private Message getLatestUnreadIncomingMessage(List<Message> messages) {
         if (messages == null || messages.isEmpty()) {
-            return false;
+            return null;
         }
-        for (Message message : messages) {
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Message message = messages.get(i);
             if (message == null) {
                 continue;
             }
             if (message.getSenderId() != null
                     && !message.getSenderId().equals(currentUserId)
                     && !"read".equals(message.getStatus())) {
-                return true;
+                return message;
             }
         }
-        return false;
+        return null;
     }
 
     private void startListeningMessages() {
@@ -465,29 +468,40 @@ public class ChatActivity extends AppCompatActivity {
                             recyclerViewChat.scrollToPosition(messageList.size() - 1);
                         }
 
-                        // Chỉ đánh dấu đã đọc khi có tin nhắn do người khác gửi và tin nhắn chưa ở trạng thái read
-                        if (hasUnreadIncomingMessage(messages)) {
-                            messageRepository.markAsRead(conversationId, currentUserId,
-                                    new MessageRepository.OnMessageStatusCallback() {
-                                        @Override
-                                        public void onSuccess() {
-                                            messageRepository.updateLastReadAt(conversationId, currentUserId,
-                                                    new MessageRepository.OnConversationReadCallback() {
-                                                        @Override
-                                                        public void onSuccess() { }
+                        Message latestUnread = getLatestUnreadIncomingMessage(messages);
+                        if (latestUnread != null && !isMarkingAsRead) {
+                            final String latestUnreadId = latestUnread.getMessageId() != null
+                                    ? latestUnread.getMessageId()
+                                    : "";
+                            if (!latestUnreadId.equals(lastMarkedReadMessageId)) {
+                                isMarkingAsRead = true;
+                                messageRepository.markAsRead(conversationId, currentUserId,
+                                        new MessageRepository.OnMessageStatusCallback() {
+                                            @Override
+                                            public void onSuccess() {
+                                                lastMarkedReadMessageId = latestUnreadId;
+                                                messageRepository.updateLastReadAt(conversationId, currentUserId,
+                                                        new MessageRepository.OnConversationReadCallback() {
+                                                            @Override
+                                                            public void onSuccess() {
+                                                                isMarkingAsRead = false;
+                                                            }
 
-                                                        @Override
-                                                        public void onError(String errorMessage) {
-                                                            Log.e(TAG, "Lỗi updateLastReadAt: " + errorMessage);
-                                                        }
-                                                    });
-                                        }
+                                                            @Override
+                                                            public void onError(String errorMessage) {
+                                                                isMarkingAsRead = false;
+                                                                Log.e(TAG, "Lỗi updateLastReadAt: " + errorMessage);
+                                                            }
+                                                        });
+                                            }
 
-                                        @Override
-                                        public void onError(String errorMessage) {
-                                            Log.e(TAG, "Lỗi markAsRead: " + errorMessage);
-                                        }
-                                    });
+                                            @Override
+                                            public void onError(String errorMessage) {
+                                                isMarkingAsRead = false;
+                                                Log.e(TAG, "Lỗi markAsRead: " + errorMessage);
+                                            }
+                                        });
+                            }
                         }
                     }
 
