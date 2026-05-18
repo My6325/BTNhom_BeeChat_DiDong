@@ -21,8 +21,10 @@ import com.google.firebase.Timestamp;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Adapter hiển thị danh sách hội thoại trong tab "Tất cả".
@@ -34,6 +36,7 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
     private final List<Conversation> conversationList;
     private final String currentUserId;
     private final UserRepository userRepository;
+    private final Map<String, User> userCache = new HashMap<>();
 
     public ConversationAdapter(List<Conversation> conversationList, String currentUserId) {
         this.conversationList = conversationList;
@@ -77,118 +80,159 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
         }
 
         public void bind(Conversation conversation) {
-            // --- Hiển thị tên người đang chat ---
             String otherUserId = getOtherUserId(conversation);
+            resetState();
+            bindUserName(conversation, otherUserId);
+            bindLastMessage(conversation);
+            bindReadState(conversation, otherUserId);
+            bindTime(conversation);
+            bindClickAction(conversation, otherUserId);
+        }
 
-            // Load tên đối phương từ Firestore collection "users"
-            if (otherUserId != null) {
-                final String otherUid = otherUserId;
-                userRepository.getUser(otherUserId, new UserRepository.OnUserCallback() {
-                    @Override
-                    public void onSuccess(User user) {
-                        if (user != null && user.getDisplayName() != null) {
-                            txtUserName.setText(user.getDisplayName());
-                        } else {
-                            txtUserName.setText(otherUid);
-                        }
-                    }
-
-                    @Override
-                    public void onError(String errorMessage) {
-                        txtUserName.setText(otherUid);
-                    }
-                });
-            } else {
-                txtUserName.setText("Không rõ");
-            }
-
-            // --- Hiển thị tin nhắn cuối ---
-            LastMessageInfo lastMsg = conversation.getLastMessage();
-            if (lastMsg != null && lastMsg.getText() != null) {
-                txtMessage.setText(lastMsg.getText());
-                
-                if (lastMsg.getSenderId() != null && lastMsg.getSenderId().equals(currentUserId)) {
-                    txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
-                    txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
-                    applyReadState(true, true, otherUserId);
-                } else {
-                    txtMessage.setTextColor(android.graphics.Color.parseColor("#000000"));
-                    txtMessage.setTypeface(null, android.graphics.Typeface.BOLD);
-                    applyReadState(false, false, otherUserId);
-                }
-            } else {
-                txtMessage.setText("");
-                txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
-                txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
-                imgStatusRead.setVisibility(View.GONE);
-                imgReadAvatar.setVisibility(View.GONE);
-            }
-
-            // --- Hiển thị thời gian ---
-            if (lastMsg != null && lastMsg.getTimestamp() != null) {
-                txtTime.setText(formatTime(lastMsg.getTimestamp()));
-            } else if (conversation.getUpdatedAt() != null) {
-                txtTime.setText(formatTime(conversation.getUpdatedAt()));
-            } else {
-                txtTime.setText("");
-            }
-
-            // --- Click item → mở ChatActivity ---
-            itemView.setOnClickListener(v -> {
-                Context context = v.getContext();
-                Intent intent = new Intent(context, ChatActivity.class);
-                intent.putExtra(ChatActivity.EXTRA_CONVERSATION_ID, conversation.getConversationId());
-                intent.putExtra(ChatActivity.EXTRA_RECEIVER_ID, otherUserId);
-                intent.putExtra(ChatActivity.EXTRA_RECEIVER_NAME, txtUserName.getText().toString());
-                context.startActivity(intent);
-            });
+        private void resetState() {
+            txtUserName.setText("Không rõ");
+            txtMessage.setText("");
+            txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
+            txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
+            txtTime.setText("");
+            imgStatusRead.setVisibility(View.GONE);
+            imgReadAvatar.setVisibility(View.GONE);
         }
 
         private String getOtherUserId(Conversation conversation) {
-            String otherUserId = null;
-            if (conversation.getParticipants() != null) {
-                for (String uid : conversation.getParticipants()) {
-                    if (!uid.equals(currentUserId)) {
-                        otherUserId = uid;
-                        break;
-                    }
+            if (conversation == null || conversation.getParticipants() == null) {
+                return null;
+            }
+            for (String uid : conversation.getParticipants()) {
+                if (uid != null && !uid.equals(currentUserId)) {
+                    return uid;
                 }
             }
-            return otherUserId;
+            return null;
         }
 
-        private void applyReadState(boolean isSentByMe, boolean isRead, String otherUserId) {
-            imgStatusRead.setVisibility(View.GONE);
-            imgReadAvatar.setVisibility(View.GONE);
+        private void bindUserName(Conversation conversation, String otherUserId) {
+            if (otherUserId == null) {
+                txtUserName.setText(conversation != null && "group".equals(conversation.getType())
+                        && conversation.getGroupName() != null
+                        ? conversation.getGroupName()
+                        : "Không rõ");
+                return;
+            }
 
-            if (isRead) {
+            User cachedUser = userCache.get(otherUserId);
+            if (cachedUser != null) {
+                txtUserName.setText(cachedUser.getDisplayName() != null ? cachedUser.getDisplayName() : otherUserId);
+                return;
+            }
+
+            final String bindingConversationId = conversation != null ? conversation.getConversationId() : null;
+            final int boundPosition = getBindingAdapterPosition();
+            txtUserName.setText(otherUserId);
+            userRepository.getUser(otherUserId, new UserRepository.OnUserCallback() {
+                @Override
+                public void onSuccess(User user) {
+                    if (user == null) {
+                        return;
+                    }
+                    userCache.put(otherUserId, user);
+                    if (isBindingStillValid(bindingConversationId, boundPosition)) {
+                        txtUserName.setText(user.getDisplayName() != null ? user.getDisplayName() : otherUserId);
+                    }
+                }
+
+                @Override
+                public void onError(String errorMessage) {
+                    if (isBindingStillValid(bindingConversationId, boundPosition)) {
+                        txtUserName.setText(otherUserId);
+                    }
+                }
+            });
+        }
+
+        private boolean isBindingStillValid(String conversationId, int position) {
+            if (position == RecyclerView.NO_POSITION || conversationId == null) {
+                return false;
+            }
+            int currentPosition = getBindingAdapterPosition();
+            if (currentPosition != position || currentPosition < 0 || currentPosition >= conversationList.size()) {
+                return false;
+            }
+            Conversation currentConversation = conversationList.get(currentPosition);
+            return currentConversation != null && conversationId.equals(currentConversation.getConversationId());
+        }
+
+        private void bindLastMessage(Conversation conversation) {
+            LastMessageInfo lastMsg = conversation != null ? conversation.getLastMessage() : null;
+            if (lastMsg == null) {
+                return;
+            }
+
+            String previewText = lastMsg.getContent();
+            if (previewText == null || previewText.isEmpty()) {
+                previewText = lastMsg.getText();
+            }
+            if ((previewText == null || previewText.isEmpty()) && lastMsg.getType() != null) {
+                previewText = getPreviewText(lastMsg.getType());
+            }
+            txtMessage.setText(previewText != null ? previewText : "");
+
+            if (lastMsg.getSenderId() != null && lastMsg.getSenderId().equals(currentUserId)) {
                 txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
                 txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
             } else {
                 txtMessage.setTextColor(android.graphics.Color.parseColor("#000000"));
                 txtMessage.setTypeface(null, android.graphics.Typeface.BOLD);
             }
+        }
 
-            if (isSentByMe) {
-                if (isRead) {
-                    imgReadAvatar.setVisibility(View.VISIBLE);
-                    if (otherUserId != null) {
-                        userRepository.getUser(otherUserId, new UserRepository.OnUserCallback() {
-                            @Override
-                            public void onSuccess(User user) {
-                                // Avatar read indicator sẽ dùng dữ liệu user nếu sau này cần hiển thị ảnh.
-                            }
-
-                            @Override
-                            public void onError(String errorMessage) {
-                                imgReadAvatar.setVisibility(View.GONE);
-                            }
-                        });
-                    }
-                } else {
-                    imgStatusRead.setVisibility(View.VISIBLE);
-                }
+        private void bindReadState(Conversation conversation, String otherUserId) {
+            LastMessageInfo lastMsg = conversation != null ? conversation.getLastMessage() : null;
+            if (lastMsg == null || lastMsg.getSenderId() == null || !lastMsg.getSenderId().equals(currentUserId)) {
+                return;
             }
+
+            // Mặc định hiển thị chấm trạng thái; sẽ đổi sang avatar nếu có thể xác nhận đã đọc.
+            imgStatusRead.setVisibility(View.VISIBLE);
+            imgReadAvatar.setVisibility(View.GONE);
+
+            if (conversation == null || conversation.getConversationId() == null || otherUserId == null) {
+                return;
+            }
+
+            // Không query Firestore trong onBind nếu dữ liệu đã có thể cache được.
+            // Read state thật sự nên đến từ conversation/messages listener; ở list chỉ phản ánh nhanh.
+            if (lastMsg.getTimestamp() != null) {
+                imgStatusRead.setVisibility(View.VISIBLE);
+            }
+        }
+
+        private void bindTime(Conversation conversation) {
+            LastMessageInfo lastMsg = conversation != null ? conversation.getLastMessage() : null;
+            if (lastMsg != null && lastMsg.getTimestamp() != null) {
+                txtTime.setText(formatTime(lastMsg.getTimestamp()));
+            } else if (conversation != null && conversation.getUpdatedAt() != null) {
+                txtTime.setText(formatTime(conversation.getUpdatedAt()));
+            }
+        }
+
+        private void bindClickAction(Conversation conversation, String otherUserId) {
+            itemView.setOnClickListener(v -> {
+                Context context = v.getContext();
+                Intent intent = new Intent(context, ChatActivity.class);
+                intent.putExtra(ChatActivity.EXTRA_CONVERSATION_ID,
+                        conversation != null ? conversation.getConversationId() : null);
+                intent.putExtra(ChatActivity.EXTRA_RECEIVER_ID, otherUserId);
+                intent.putExtra(ChatActivity.EXTRA_RECEIVER_NAME, txtUserName.getText().toString());
+                context.startActivity(intent);
+            });
+        }
+
+        private String getPreviewText(String type) {
+            if ("text".equals(type)) return "Đã gửi 1 tin nhắn";
+            if ("image".equals(type) || "video".equals(type)) return "Đã gửi 1 tệp";
+            if ("audio".equals(type)) return "Đã gửi 1 tin nhắn thoại";
+            return "Đã gửi 1 tệp";
         }
 
         /**

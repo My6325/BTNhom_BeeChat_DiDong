@@ -4,9 +4,11 @@ import com.google.firebase.Timestamp;
 
 public class LastMessageInfo {
     private String text;
+    private String content;
     private String senderId;
     private String senderName;
     private String type;
+    private String mediaUrl;
     private Timestamp timestamp;
 
     public LastMessageInfo() {}
@@ -17,6 +19,22 @@ public class LastMessageInfo {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public String getMediaUrl() {
+        return mediaUrl;
+    }
+
+    public void setMediaUrl(String mediaUrl) {
+        this.mediaUrl = mediaUrl;
     }
 
     public String getSenderId() {

@@ -95,7 +95,7 @@ public class MessageRepository {
 
         Map<String, Object> msgData = new HashMap<>();
         msgData.put("senderId", senderId.trim());
-        msgData.put("senderName", senderName != null ? senderName : "");
+        msgData.put("senderName", normalizeSenderName(senderName));
         msgData.put("type", type.trim());
         msgData.put("status", "sent");
         msgData.put("createdAt", FieldValue.serverTimestamp());
@@ -116,10 +116,11 @@ public class MessageRepository {
 
         Map<String, Object> lastMessage = new HashMap<>();
         lastMessage.put("senderId", senderId.trim());
-        lastMessage.put("senderName", senderName != null ? senderName : "");
+        lastMessage.put("senderName", normalizeSenderName(senderName));
         lastMessage.put("type", type.trim());
         lastMessage.put("timestamp", FieldValue.serverTimestamp());
-        lastMessage.put("content", "text".equals(type) ? text.trim() : getPreviewText(type));
+        lastMessage.put("text", "text".equals(type) ? text.trim() : "");
+        lastMessage.put("content", getPreviewText(type));
         if (!"text".equals(type)) {
             lastMessage.put("mediaUrl", mediaUrl.trim());
         }
@@ -142,6 +143,19 @@ public class MessageRepository {
         if ("video".equals(type)) return "Đã gửi một video";
         if ("audio".equals(type)) return "Đã gửi một tin nhắn thoại";
         return "Đã gửi một tệp";
+    }
+
+    private String normalizeSenderName(String senderName) {
+        if (senderName == null) {
+            return "";
+        }
+        String trimmed = senderName.trim();
+        if (trimmed.isEmpty() || "Tôi".equals(trimmed)) {
+            FirebaseFirestore firestore = db;
+            // senderName sẽ được resolve ở UI layer khi cần; lưu fallback rỗng thay vì "Tôi"
+            return "";
+        }
+        return trimmed;
     }
 
     /**
@@ -209,8 +223,9 @@ public class MessageRepository {
 
         Map<String, Object> lastMessage = new HashMap<>();
         lastMessage.put("text", text.trim());
+        lastMessage.put("content", "Đã gửi một tin nhắn");
         lastMessage.put("senderId", senderId.trim());
-        lastMessage.put("senderName", senderName != null ? senderName : "");
+        lastMessage.put("senderName", normalizeSenderName(senderName));
         lastMessage.put("type", "text");
         lastMessage.put("timestamp", FieldValue.serverTimestamp());
 

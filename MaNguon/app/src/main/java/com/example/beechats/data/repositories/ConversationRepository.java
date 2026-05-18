@@ -32,8 +32,14 @@ public class ConversationRepository {
         void onError(String errorMessage);
     }
 
+    public interface OnMigrationCallback {
+        void onSuccess(int updatedCount);
+        void onError(String errorMessage);
+    }
+
     private final FirebaseFirestore db;
     private static final String COLLECTION = "conversations";
+    private static final String MSG_COLLECTION = "messages";
 
     public ConversationRepository() {
         this.db = FirebaseFirestore.getInstance();
@@ -42,6 +48,84 @@ public class ConversationRepository {
     /** Constructor cho phép inject dependency (dùng trong unit test). */
     public ConversationRepository(FirebaseFirestore db) {
         this.db = db;
+    }
+
+    public void normalizeConversationData(OnMigrationCallback callback) {
+        db.collection(COLLECTION)
+            .get()
+            .addOnSuccessListener(snapshot -> {
+                if (snapshot.isEmpty()) {
+                    callback.onSuccess(0);
+                    return;
+                }
+
+                WriteBatch batch = db.batch();
+                int updatedCount = 0;
+
+                for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                    Map<String, Object> updates = normalizeConversationDocument(doc);
+                    if (updates.isEmpty()) {
+                        continue;
+                    }
+                    batch.set(doc.getReference(), updates, SetOptions.merge());
+                    updatedCount++;
+                }
+
+                if (updatedCount == 0) {
+                    callback.onSuccess(0);
+                    return;
+                }
+
+                final int normalizedCount = updatedCount;
+                batch.commit()
+                    .addOnSuccessListener(unused -> callback.onSuccess(normalizedCount))
+                    .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            })
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    private Map<String, Object> normalizeConversationDocument(com.google.firebase.firestore.DocumentSnapshot doc) {
+        Map<String, Object> updates = new HashMap<>();
+        Map<String, Object> lastMessage = doc.contains("lastMessage")
+            ? (Map<String, Object>) doc.get("lastMessage")
+            : null;
+        if (lastMessage == null || lastMessage.isEmpty()) {
+            return updates;
+        }
+
+        String type = stringValue(lastMessage.get("type"));
+        String text = stringValue(lastMessage.get("text"));
+        String content = stringValue(lastMessage.get("content"));
+        String mediaUrl = stringValue(lastMessage.get("mediaUrl"));
+
+        boolean isMedia = "image".equals(type) || "video".equals(type) || !mediaUrl.isEmpty();
+        String normalizedType = !type.isEmpty() ? type : (isMedia ? "image" : "text");
+        String normalizedContent;
+        String normalizedText;
+
+        if (isMedia) {
+            normalizedContent = "Đã gửi 1 tệp";
+            normalizedText = text;
+        } else {
+            normalizedContent = "Đã gửi 1 tin nhắn";
+            normalizedText = text.isEmpty() ? content : text;
+        }
+
+        Map<String, Object> normalizedLastMessage = new HashMap<>(lastMessage);
+        normalizedLastMessage.put("type", normalizedType);
+        normalizedLastMessage.put("text", normalizedText);
+        normalizedLastMessage.put("content", normalizedContent);
+        if (isMedia && mediaUrl.isEmpty()) {
+            normalizedLastMessage.remove("mediaUrl");
+        }
+
+        updates.put("lastMessage", normalizedLastMessage);
+        updates.put("updatedAt", FieldValue.serverTimestamp());
+        return updates;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     /**
@@ -70,10 +154,10 @@ public class ConversationRepository {
         data.put("updatedAt", FieldValue.serverTimestamp());
 
         db.collection(COLLECTION)
-                .document(conversationId)
-                .set(data, SetOptions.merge())
-                .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
-                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            .document(conversationId)
+            .set(data, SetOptions.merge())
+            .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 
     /**
@@ -137,8 +221,8 @@ public class ConversationRepository {
         }
 
         batch.commit()
-                .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
-                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            .addOnSuccessListener(unused -> callback.onSuccess(conversationId))
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 
     /**
@@ -181,8 +265,8 @@ public class ConversationRepository {
         batch.set(memberRef, memberData);
 
         batch.commit()
-                .addOnSuccessListener(unused -> callback.onSuccess())
-                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            .addOnSuccessListener(unused -> callback.onSuccess())
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 
     /**
@@ -218,33 +302,33 @@ public class ConversationRepository {
 
         // Kiểm tra quyền admin của requester trước khi thực hiện
         requesterRef.get()
-                .addOnFailureListener(e -> callback.onError(e.getMessage()))
-                .addOnSuccessListener(snapshot -> {
-                    if (!snapshot.exists()) {
-                        callback.onError("Người yêu cầu không phải thành viên nhóm.");
-                        return;
-                    }
-                    String role = snapshot.getString("role");
-                    if (!"admin".equals(role)) {
-                        callback.onError("Chỉ admin mới có thể xóa thành viên.");
-                        return;
-                    }
+            .addOnFailureListener(e -> callback.onError(e.getMessage()))
+            .addOnSuccessListener(snapshot -> {
+                if (!snapshot.exists()) {
+                    callback.onError("Người yêu cầu không phải thành viên nhóm.");
+                    return;
+                }
+                String role = snapshot.getString("role");
+                if (!"admin".equals(role)) {
+                    callback.onError("Chỉ admin mới có thể xóa thành viên.");
+                    return;
+                }
 
-                    DocumentReference memberRef = convRef.collection("members").document(trimmedUserId);
+                DocumentReference memberRef = convRef.collection("members").document(trimmedUserId);
 
-                    Map<String, Object> convUpdate = new HashMap<>();
-                    convUpdate.put("participants", FieldValue.arrayRemove(trimmedUserId));
-                    convUpdate.put("participantCount", FieldValue.increment(-1));
-                    convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+                Map<String, Object> convUpdate = new HashMap<>();
+                convUpdate.put("participants", FieldValue.arrayRemove(trimmedUserId));
+                convUpdate.put("participantCount", FieldValue.increment(-1));
+                convUpdate.put("updatedAt", FieldValue.serverTimestamp());
 
-                    WriteBatch batch = db.batch();
-                    batch.update(convRef, convUpdate);
-                    batch.delete(memberRef);
+                WriteBatch batch = db.batch();
+                batch.update(convRef, convUpdate);
+                batch.delete(memberRef);
 
-                    batch.commit()
-                            .addOnSuccessListener(unused -> callback.onSuccess())
-                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
-                });
+                batch.commit()
+                    .addOnSuccessListener(unused -> callback.onSuccess())
+                    .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            });
     }
 
     /**
@@ -288,36 +372,36 @@ public class ConversationRepository {
 
         // Kiểm tra quyền admin của requester trước khi thực hiện
         requesterRef.get()
-                .addOnFailureListener(e -> callback.onError(e.getMessage()))
-                .addOnSuccessListener(requesterSnap -> {
-                    if (!requesterSnap.exists()) {
-                        callback.onError("Người yêu cầu không phải thành viên nhóm.");
-                        return;
-                    }
-                    if (!"admin".equals(requesterSnap.getString("role"))) {
-                        callback.onError("Chỉ admin mới có thể thay đổi vai trò thành viên.");
-                        return;
-                    }
+            .addOnFailureListener(e -> callback.onError(e.getMessage()))
+            .addOnSuccessListener(requesterSnap -> {
+                if (!requesterSnap.exists()) {
+                    callback.onError("Người yêu cầu không phải thành viên nhóm.");
+                    return;
+                }
+                if (!"admin".equals(requesterSnap.getString("role"))) {
+                    callback.onError("Chỉ admin mới có thể thay đổi vai trò thành viên.");
+                    return;
+                }
 
-                    if ("member".equals(newRole)) {
-                        // Cần kiểm tra không được hạ cấp admin cuối cùng
-                        convRef.get()
-                                .addOnFailureListener(e -> callback.onError(e.getMessage()))
-                                .addOnSuccessListener(convSnap -> {
-                                    @SuppressWarnings("unchecked")
-                                    List<String> adminIds = (List<String>) convSnap.get("adminIds");
-                                    if (adminIds != null && adminIds.size() == 1
-                                            && adminIds.contains(trimmedMemberId)) {
-                                        callback.onError("Không thể hạ cấp admin cuối cùng. Hãy chỉ định admin khác trước.");
-                                        return;
-                                    }
-                                    doSetRoleBatch(convRef, memberRef, trimmedMemberId, newRole, callback);
-                                });
-                    } else {
-                        // Thăng lên admin — không cần kiểm tra thêm
-                        doSetRoleBatch(convRef, memberRef, trimmedMemberId, newRole, callback);
-                    }
-                });
+                if ("member".equals(newRole)) {
+                    // Cần kiểm tra không được hạ cấp admin cuối cùng
+                    convRef.get()
+                        .addOnFailureListener(e -> callback.onError(e.getMessage()))
+                        .addOnSuccessListener(convSnap -> {
+                            @SuppressWarnings("unchecked")
+                            List<String> adminIds = (List<String>) convSnap.get("adminIds");
+                            if (adminIds != null && adminIds.size() == 1
+                                && adminIds.contains(trimmedMemberId)) {
+                                callback.onError("Không thể hạ cấp admin cuối cùng. Hãy chỉ định admin khác trước.");
+                                return;
+                            }
+                            doSetRoleBatch(convRef, memberRef, trimmedMemberId, newRole, callback);
+                        });
+                } else {
+                    // Thăng lên admin — không cần kiểm tra thêm
+                    doSetRoleBatch(convRef, memberRef, trimmedMemberId, newRole, callback);
+                }
+            });
     }
 
     /** Thực hiện WriteBatch cập nhật role thành viên + adminIds trong conversation. */
@@ -328,8 +412,8 @@ public class ConversationRepository {
 
         Map<String, Object> convUpdate = new HashMap<>();
         convUpdate.put("adminIds", "admin".equals(newRole)
-                ? FieldValue.arrayUnion(memberId)
-                : FieldValue.arrayRemove(memberId));
+            ? FieldValue.arrayUnion(memberId)
+            : FieldValue.arrayRemove(memberId));
         convUpdate.put("updatedAt", FieldValue.serverTimestamp());
 
         WriteBatch batch = db.batch();
@@ -337,8 +421,8 @@ public class ConversationRepository {
         batch.update(convRef, convUpdate);
 
         batch.commit()
-                .addOnSuccessListener(unused -> callback.onSuccess())
-                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            .addOnSuccessListener(unused -> callback.onSuccess())
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 
     /**
@@ -364,9 +448,9 @@ public class ConversationRepository {
         }
 
         DocumentReference memberRef = db.collection(COLLECTION)
-                .document(convId.trim())
-                .collection("members")
-                .document(memberId.trim());
+            .document(convId.trim())
+            .collection("members")
+            .document(memberId.trim());
 
         Map<String, Object> update = new HashMap<>();
         // Nickname null hoặc blank → xóa field để hiển thị về displayName mặc định
@@ -378,8 +462,8 @@ public class ConversationRepository {
         update.put("updatedAt", FieldValue.serverTimestamp());
 
         memberRef.update(update)
-                .addOnSuccessListener(unused -> callback.onSuccess())
-                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            .addOnSuccessListener(unused -> callback.onSuccess())
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 
     /**
@@ -395,16 +479,16 @@ public class ConversationRepository {
         }
 
         db.collection(COLLECTION)
-                .document(conversationId)
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        Conversation conversation = snapshot.toObject(Conversation.class);
-                        callback.onSuccess(conversation);
-                    } else {
-                        callback.onError("Hội thoại không tồn tại.");
-                    }
-                })
-                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+            .document(conversationId)
+            .get()
+            .addOnSuccessListener(snapshot -> {
+                if (snapshot.exists()) {
+                    Conversation conversation = snapshot.toObject(Conversation.class);
+                    callback.onSuccess(conversation);
+                } else {
+                    callback.onError("Hội thoại không tồn tại.");
+                }
+            })
+            .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 }

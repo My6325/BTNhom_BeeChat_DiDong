@@ -28,6 +28,7 @@ import com.example.beechats.data.models.Message;
 import com.example.beechats.data.repositories.CallRepository;
 import com.example.beechats.data.repositories.CallRepository;
 import com.example.beechats.data.repositories.MessageRepository;
+import com.example.beechats.data.repositories.UserRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FieldValue;
@@ -60,6 +61,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private MessageRepository messageRepository;
     private CallRepository callRepository;
+    private UserRepository userRepository;
     private ListenerRegistration messageListener;
     private ActivityResultLauncher<String> pickImageLauncher;
 
@@ -99,6 +101,7 @@ public class ChatActivity extends AppCompatActivity {
 
         messageRepository = new MessageRepository();
         callRepository = new CallRepository();
+        userRepository = new UserRepository();
 
         initViews();
         setupImagePicker();
@@ -125,6 +128,7 @@ public class ChatActivity extends AppCompatActivity {
     private void setupRecyclerView() {
         messageList = new ArrayList<>();
         messageAdapter = new MessageAdapter(messageList, currentUserId);
+        messageAdapter.setConversationParticipants(currentUserId, receiverId);
         messageAdapter.setConversationParticipants(currentUserId, receiverId);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
@@ -171,6 +175,7 @@ public class ChatActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(String messageId) {
                         Log.d(TAG, "Gửi tin nhắn thành công: " + messageId);
+                        resolveCurrentUserNameAndRefresh();
                         // Tin nhắn sẽ tự động xuất hiện thông qua listener real-time
                     }
 
@@ -281,6 +286,7 @@ public class ChatActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(String messageId) {
                         Log.d(TAG, "Gửi ảnh thành công: " + messageId);
+                        resolveCurrentUserNameAndRefresh();
                     }
 
                     @Override
@@ -290,6 +296,38 @@ public class ChatActivity extends AppCompatActivity {
                                 "Lưu ảnh thất bại", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    private void resolveCurrentUserNameAndRefresh() {
+        if (currentUserId == null) {
+            return;
+        }
+
+        userRepository.getUser(currentUserId, new UserRepository.OnUserCallback() {
+            @Override
+            public void onSuccess(com.example.beechats.data.models.User user) {
+                if (user != null && user.getDisplayName() != null && !user.getDisplayName().trim().isEmpty()) {
+                    currentUserName = user.getDisplayName().trim();
+                    return;
+                }
+                if (TextUtils.isEmpty(currentUserName) || "Tôi".equals(currentUserName)) {
+                    FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
+                    if (firebaseUser != null && firebaseUser.getDisplayName() != null
+                            && !firebaseUser.getDisplayName().trim().isEmpty()) {
+                        currentUserName = firebaseUser.getDisplayName().trim();
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (firebaseUser != null && firebaseUser.getDisplayName() != null
+                        && !firebaseUser.getDisplayName().trim().isEmpty()) {
+                    currentUserName = firebaseUser.getDisplayName().trim();
+                }
+            }
+        });
     }
 
     /**
@@ -341,6 +379,7 @@ public class ChatActivity extends AppCompatActivity {
 
                         messageList.clear();
                         messageList.addAll(messages);
+                        messageAdapter.setConversationParticipants(currentUserId, receiverId);
                         messageAdapter.updateReadStatus();
                         messageAdapter.notifyDataSetChanged();
 
