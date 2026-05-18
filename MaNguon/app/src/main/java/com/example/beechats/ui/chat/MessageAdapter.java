@@ -26,19 +26,29 @@ import java.util.Map;
  */
 public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
+    public interface OnMediaClickListener {
+        void onVideoClick(String videoUrl);
+    }
+
     private static final int VIEW_TYPE_SENT = 1;
     private static final int VIEW_TYPE_RECEIVED = 2;
 
     private final List<Message> messageList;
     private final String currentUserId;
+    private final OnMediaClickListener mediaClickListener;
     private String peerUserId;
 
     // Vị trí tin nhắn cuối cùng do mình gửi mà đối phương đã đọc
     private int lastReadPosition = -1;
 
     public MessageAdapter(List<Message> messageList, String currentUserId) {
+        this(messageList, currentUserId, null);
+    }
+
+    public MessageAdapter(List<Message> messageList, String currentUserId, OnMediaClickListener mediaClickListener) {
         this.messageList = messageList;
         this.currentUserId = currentUserId;
+        this.mediaClickListener = mediaClickListener;
     }
 
     public void setConversationParticipants(String currentUserId, String peerUserId) {
@@ -110,9 +120,9 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
         if (holder.getItemViewType() == VIEW_TYPE_SENT) {
             boolean showAvatar = (position == lastReadPosition);
-            ((SentMessageViewHolder) holder).bind(message, isRead, showAvatar);
+            ((SentMessageViewHolder) holder).bind(message, isRead, showAvatar, mediaClickListener);
         } else {
-            ((ReceivedMessageViewHolder) holder).bind(message, isRead);
+            ((ReceivedMessageViewHolder) holder).bind(message, isRead, mediaClickListener);
         }
     }
 
@@ -141,6 +151,14 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         return readBy.containsKey(currentUserId);
     }
 
+    private static boolean isMediaMessage(Message message) {
+        if (message == null) {
+            return false;
+        }
+        String type = message.getType();
+        return "image".equals(type) || "video".equals(type);
+    }
+
     // ─── ViewHolder cho tin nhắn GỬI ĐI (item_chat_user.xml) ───
 
     static class SentMessageViewHolder extends RecyclerView.ViewHolder {
@@ -157,7 +175,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             imgReadAvatar = itemView.findViewById(R.id.imgReadAvatar);
         }
 
-        public void bind(Message message, boolean isRead, boolean showAvatar) {
+        public void bind(Message message, boolean isRead, boolean showAvatar, OnMediaClickListener mediaClickListener) {
             if (message.isRecalled()) {
                 showText("Tin nhắn đã thu hồi");
                 tvStatusText.setVisibility(View.GONE);
@@ -165,8 +183,8 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 return;
             }
 
-            if ("image".equals(message.getType()) && message.getMediaUrl() != null) {
-                showImage(message.getMediaUrl());
+            if (isMediaMessage(message)) {
+                showMedia(message, mediaClickListener);
             } else {
                 showText(message.getText());
             }
@@ -191,13 +209,27 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
         }
 
-        private void showImage(String url) {
+        private void showMedia(Message message, OnMediaClickListener mediaClickListener) {
             tvMessage.setVisibility(View.GONE);
             imgMessage.setVisibility(View.VISIBLE);
+            String mediaUrl = message.getMediaUrl();
+            if (mediaUrl == null || mediaUrl.trim().isEmpty()) {
+                mediaUrl = message.getMediaThumbnailUrl();
+            }
+            final String finalMediaUrl = mediaUrl;
             Glide.with(itemView.getContext())
-                    .load(url)
+                    .load(finalMediaUrl)
+                    .placeholder(R.drawable.icon)
+                    .error(R.drawable.icon)
                     .into(imgMessage);
+
+            if (mediaClickListener != null && "video".equals(message.getType())) {
+                itemView.setOnClickListener(v -> mediaClickListener.onVideoClick(finalMediaUrl));
+            } else {
+                itemView.setOnClickListener(null);
+            }
         }
+
     }
 
     // ─── ViewHolder cho tin nhắn NHẬN (item_chat_friend.xml) ───
@@ -212,7 +244,8 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             imgMessage = itemView.findViewById(R.id.imgMessage);
         }
 
-        public void bind(Message message, boolean isRead) {
+        public void bind(Message message, boolean isRead, OnMediaClickListener mediaClickListener) {
+            itemView.setOnClickListener(null);
             if (message.isRecalled()) {
                 txtMessage.setVisibility(View.VISIBLE);
                 imgMessage.setVisibility(View.GONE);
@@ -222,12 +255,23 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 return;
             }
 
-            if ("image".equals(message.getType()) && message.getMediaUrl() != null) {
+            if (isMediaMessage(message)) {
                 txtMessage.setVisibility(View.GONE);
                 imgMessage.setVisibility(View.VISIBLE);
+                String mediaUrl = message.getMediaUrl();
+                if (mediaUrl == null || mediaUrl.trim().isEmpty()) {
+                    mediaUrl = message.getMediaThumbnailUrl();
+                }
+                final String finalMediaUrl = mediaUrl;
                 Glide.with(itemView.getContext())
-                        .load(message.getMediaUrl())
+                        .load(finalMediaUrl)
+                        .placeholder(R.drawable.icon)
+                        .error(R.drawable.icon)
                         .into(imgMessage);
+
+                if (mediaClickListener != null && "video".equals(message.getType())) {
+                    itemView.setOnClickListener(v -> mediaClickListener.onVideoClick(finalMediaUrl));
+                }
             } else {
                 txtMessage.setVisibility(View.VISIBLE);
                 imgMessage.setVisibility(View.GONE);

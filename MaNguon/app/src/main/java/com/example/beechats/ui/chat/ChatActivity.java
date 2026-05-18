@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.content.Intent;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -64,6 +66,7 @@ public class ChatActivity extends AppCompatActivity {
     private UserRepository userRepository;
     private ListenerRegistration messageListener;
     private ActivityResultLauncher<String> pickMediaLauncher;
+    private ProgressDialog uploadProgressDialog;
 
     private String currentUserId;
     private String currentUserName;
@@ -107,6 +110,7 @@ public class ChatActivity extends AppCompatActivity {
         setupMediaPicker();
         setupRecyclerView();
         setupListeners();
+        setupUploadProgressDialog();
 
         // Hiển thị tên người đang chat
         if (receiverName != null && !receiverName.isEmpty()) {
@@ -127,7 +131,11 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setupRecyclerView() {
         messageList = new ArrayList<>();
-        messageAdapter = new MessageAdapter(messageList, currentUserId);
+        messageAdapter = new MessageAdapter(messageList, currentUserId, videoUrl -> {
+            Intent intent = new Intent(ChatActivity.this, VideoPlayerActivity.class);
+            intent.putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, videoUrl);
+            startActivity(intent);
+        });
         messageAdapter.setConversationParticipants(currentUserId, receiverId);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
@@ -146,7 +154,7 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
 
-        btnPickImage.setOnClickListener(v -> pickMediaLauncher.launch("image/* video/*"));
+        btnPickImage.setOnClickListener(v -> showMediaTypeChooser());
         btnVoiceCall.setOnClickListener(v -> startZegoCall("voice"));
         btnVideoCall.setOnClickListener(v -> startZegoCall("video"));
     }
@@ -160,6 +168,26 @@ public class ChatActivity extends AppCompatActivity {
                     }
                 }
         );
+    }
+
+    private void setupUploadProgressDialog() {
+        uploadProgressDialog = new ProgressDialog(this);
+        uploadProgressDialog.setMessage("Đang tải lên...");
+        uploadProgressDialog.setCancelable(false);
+    }
+
+    private void showMediaTypeChooser() {
+        String[] options = new String[]{"Gửi ảnh", "Gửi video"};
+        new AlertDialog.Builder(this)
+                .setTitle("Chọn loại media")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        pickMediaLauncher.launch("image/*");
+                    } else {
+                        pickMediaLauncher.launch("video/*");
+                    }
+                })
+                .show();
     }
 
     /**
@@ -210,8 +238,16 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
 
+        if (uploadProgressDialog != null && !uploadProgressDialog.isShowing()) {
+            uploadProgressDialog.show();
+        }
+        Toast.makeText(this,
+                mediaType.equals("video") ? "Đang tải video lên..." : "Đang tải ảnh lên...",
+                Toast.LENGTH_SHORT).show();
+
         MediaManager.get().upload(uri)
                 .unsigned("beechat_chat")
+                .option("resource_type", mediaType.equals("video") ? "video" : "image")
                 .callback(new UploadCallback() {
                     @Override
                     public void onStart(String requestId) {
@@ -223,8 +259,24 @@ public class ChatActivity extends AppCompatActivity {
 
                     @Override
                     public void onSuccess(String requestId, Map resultData) {
-                        String mediaUrl = String.valueOf(resultData.get("secure_url"));
-                        String thumbnailUrl = mediaType.equals("video") ? String.valueOf(resultData.get("thumbnail_url")) : null;
+                        if (uploadProgressDialog != null && uploadProgressDialog.isShowing()) {
+                            uploadProgressDialog.dismiss();
+                        }
+                        Log.d(TAG, "Upload result data: " + resultData);
+                        Object secureUrlObj = resultData.get("secure_url");
+                        if (secureUrlObj == null) {
+                            Toast.makeText(ChatActivity.this,
+                                    "Không lấy được link upload", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        String mediaUrl = String.valueOf(secureUrlObj);
+                        String thumbnailUrl = null;
+                        if (mediaType.equals("video")) {
+                            Object thumbnailObj = resultData.get("thumbnail_url");
+                            if (thumbnailObj != null) {
+                                thumbnailUrl = String.valueOf(thumbnailObj);
+                            }
+                        }
                         Long duration = null;
                         Object durationObj = resultData.get("duration");
                         if (durationObj instanceof Number) {
@@ -235,6 +287,9 @@ public class ChatActivity extends AppCompatActivity {
 
                     @Override
                     public void onError(String requestId, ErrorInfo error) {
+                        if (uploadProgressDialog != null && uploadProgressDialog.isShowing()) {
+                            uploadProgressDialog.dismiss();
+                        }
                         Log.e(TAG, "Upload media thất bại: " + error.getDescription());
                         Toast.makeText(ChatActivity.this,
                                 "Upload media thất bại", Toast.LENGTH_SHORT).show();
@@ -307,6 +362,7 @@ public class ChatActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(String messageId) {
                         Log.d(TAG, "Gửi media thành công: " + messageId);
+                        Toast.makeText(ChatActivity.this, "Đã gửi thành công", Toast.LENGTH_SHORT).show();
                         resolveCurrentUserNameAndRefresh();
                     }
 
