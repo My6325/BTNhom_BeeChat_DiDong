@@ -220,31 +220,49 @@ public class ConversationRepository {
         // Kiểm tra quyền admin của requester trước khi thực hiện
         requesterRef.get()
             .addOnFailureListener(e -> callback.onError(e.getMessage()))
-            .addOnSuccessListener(snapshot -> {
-                if (!snapshot.exists()) {
+            .addOnSuccessListener(requesterSnap -> {
+                if (!requesterSnap.exists()) {
                     callback.onError("Người yêu cầu không phải thành viên nhóm.");
                     return;
                 }
-                String role = snapshot.getString("role");
+                String role = requesterSnap.getString("role");
                 if (!"admin".equals(role)) {
                     callback.onError("Chỉ admin mới có thể xóa thành viên.");
                     return;
                 }
 
                 DocumentReference memberRef = convRef.collection("members").document(trimmedUserId);
+                memberRef.get()
+                    .addOnFailureListener(e -> callback.onError(e.getMessage()))
+                    .addOnSuccessListener(memberSnap -> {
+                        if (!memberSnap.exists()) {
+                            callback.onError("Thành viên đã được xóa hoặc không tồn tại.");
+                            return;
+                        }
 
-                Map<String, Object> convUpdate = new HashMap<>();
-                convUpdate.put("participants", FieldValue.arrayRemove(trimmedUserId));
-                convUpdate.put("participantCount", FieldValue.increment(-1));
-                convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+                        convRef.get()
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()))
+                            .addOnSuccessListener(convSnap -> {
+                                @SuppressWarnings("unchecked")
+                                List<String> participants = (List<String>) convSnap.get("participants");
+                                boolean shouldDecrement = participants != null && participants.contains(trimmedUserId);
 
-                WriteBatch batch = db.batch();
-                batch.update(convRef, convUpdate);
-                batch.delete(memberRef);
+                                WriteBatch batch = db.batch();
+                                Map<String, Object> convUpdate = new HashMap<>();
+                                convUpdate.put("participants", FieldValue.arrayRemove(trimmedUserId));
+                                convUpdate.put("updatedAt", FieldValue.serverTimestamp());
+                                if (shouldDecrement) {
+                                    convUpdate.put("participantCount", FieldValue.increment(-1));
+                                }
 
-                batch.commit()
-                    .addOnSuccessListener(unused -> callback.onSuccess())
-                    .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                                batch.update(convRef, convUpdate);
+                                batch.delete(memberRef);
+
+                                batch.commit()
+                                    .addOnSuccessListener(unused -> callback.onSuccess())
+                                    .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                            });
+                    });
             });
     }
 
