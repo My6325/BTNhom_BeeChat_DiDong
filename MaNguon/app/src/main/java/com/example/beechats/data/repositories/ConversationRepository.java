@@ -32,11 +32,6 @@ public class ConversationRepository {
         void onError(String errorMessage);
     }
 
-    public interface OnMigrationCallback {
-        void onSuccess(int updatedCount);
-        void onError(String errorMessage);
-    }
-
     private final FirebaseFirestore db;
     private static final String COLLECTION = "conversations";
     private static final String MSG_COLLECTION = "messages";
@@ -48,84 +43,6 @@ public class ConversationRepository {
     /** Constructor cho phép inject dependency (dùng trong unit test). */
     public ConversationRepository(FirebaseFirestore db) {
         this.db = db;
-    }
-
-    public void normalizeConversationData(OnMigrationCallback callback) {
-        db.collection(COLLECTION)
-            .get()
-            .addOnSuccessListener(snapshot -> {
-                if (snapshot.isEmpty()) {
-                    callback.onSuccess(0);
-                    return;
-                }
-
-                WriteBatch batch = db.batch();
-                int updatedCount = 0;
-
-                for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
-                    Map<String, Object> updates = normalizeConversationDocument(doc);
-                    if (updates.isEmpty()) {
-                        continue;
-                    }
-                    batch.set(doc.getReference(), updates, SetOptions.merge());
-                    updatedCount++;
-                }
-
-                if (updatedCount == 0) {
-                    callback.onSuccess(0);
-                    return;
-                }
-
-                final int normalizedCount = updatedCount;
-                batch.commit()
-                    .addOnSuccessListener(unused -> callback.onSuccess(normalizedCount))
-                    .addOnFailureListener(e -> callback.onError(e.getMessage()));
-            })
-            .addOnFailureListener(e -> callback.onError(e.getMessage()));
-    }
-
-    private Map<String, Object> normalizeConversationDocument(com.google.firebase.firestore.DocumentSnapshot doc) {
-        Map<String, Object> updates = new HashMap<>();
-        Map<String, Object> lastMessage = doc.contains("lastMessage")
-            ? (Map<String, Object>) doc.get("lastMessage")
-            : null;
-        if (lastMessage == null || lastMessage.isEmpty()) {
-            return updates;
-        }
-
-        String type = stringValue(lastMessage.get("type"));
-        String text = stringValue(lastMessage.get("text"));
-        String content = stringValue(lastMessage.get("content"));
-        String mediaUrl = stringValue(lastMessage.get("mediaUrl"));
-
-        boolean isMedia = "image".equals(type) || "video".equals(type) || !mediaUrl.isEmpty();
-        String normalizedType = !type.isEmpty() ? type : (isMedia ? "image" : "text");
-        String normalizedContent;
-        String normalizedText;
-
-        if (isMedia) {
-            normalizedContent = "Đã gửi 1 tệp";
-            normalizedText = text;
-        } else {
-            normalizedContent = "Đã gửi 1 tin nhắn";
-            normalizedText = text.isEmpty() ? content : text;
-        }
-
-        Map<String, Object> normalizedLastMessage = new HashMap<>(lastMessage);
-        normalizedLastMessage.put("type", normalizedType);
-        normalizedLastMessage.put("text", normalizedText);
-        normalizedLastMessage.put("content", normalizedContent);
-        if (isMedia && mediaUrl.isEmpty()) {
-            normalizedLastMessage.remove("mediaUrl");
-        }
-
-        updates.put("lastMessage", normalizedLastMessage);
-        updates.put("updatedAt", FieldValue.serverTimestamp());
-        return updates;
-    }
-
-    private String stringValue(Object value) {
-        return value == null ? "" : String.valueOf(value).trim();
     }
 
     /**

@@ -2,6 +2,7 @@ package com.example.beechats.data.models;
 
 import com.google.firebase.Timestamp;
 import java.util.List;
+import java.util.Map;
 
 public class Conversation {
     private String conversationId;
@@ -13,6 +14,7 @@ public class Conversation {
     private List<String> adminIds;
     private String createdBy;
     private LastMessageInfo lastMessage;
+    private Map<String, Timestamp> lastReadAt;
     private Timestamp createdAt;
     private Timestamp updatedAt;
 
@@ -88,6 +90,14 @@ public class Conversation {
 
     public void setLastMessage(LastMessageInfo lastMessage) {
         this.lastMessage = lastMessage;
+    }
+
+    public Map<String, Timestamp> getLastReadAt() {
+        return lastReadAt;
+    }
+
+    public void setLastReadAt(Map<String, Timestamp> lastReadAt) {
+        this.lastReadAt = lastReadAt;
     }
 
     public Timestamp getCreatedAt() {

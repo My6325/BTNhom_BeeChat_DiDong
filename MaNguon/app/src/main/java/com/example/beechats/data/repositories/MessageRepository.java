@@ -32,6 +32,11 @@ public class MessageRepository {
         void onError(String errorMessage);
     }
 
+    public interface OnConversationReadCallback {
+        void onSuccess();
+        void onError(String errorMessage);
+    }
+
     private final FirebaseFirestore db;
     private static final String CONV_COLLECTION = "conversations";
     private static final String MSG_SUBCOLLECTION = "messages";
@@ -507,6 +512,28 @@ public class MessageRepository {
                             .addOnSuccessListener(unused -> callback.onSuccess())
                             .addOnFailureListener(e -> callback.onError(e.getMessage()));
                 })
+                .addOnFailureListener(e -> callback.onError(e.getMessage()));
+    }
+
+    public void updateLastReadAt(String conversationId, String userId,
+                                 OnConversationReadCallback callback) {
+        if (conversationId == null || conversationId.trim().isEmpty()) {
+            callback.onError("ID hội thoại không hợp lệ.");
+            return;
+        }
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("ID người dùng không hợp lệ.");
+            return;
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("lastReadAt." + userId.trim(), FieldValue.serverTimestamp());
+        updates.put("updatedAt", FieldValue.serverTimestamp());
+
+        db.collection(CONV_COLLECTION)
+                .document(conversationId.trim())
+                .update(updates)
+                .addOnSuccessListener(unused -> callback.onSuccess())
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 

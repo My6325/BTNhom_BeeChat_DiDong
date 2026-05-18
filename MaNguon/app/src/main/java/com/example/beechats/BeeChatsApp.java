@@ -1,13 +1,11 @@
 package com.example.beechats;
 
 import android.app.Application;
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import androidx.lifecycle.ProcessLifecycleOwner;
 
 import com.cloudinary.android.MediaManager;
-import com.example.beechats.data.repositories.ConversationRepository;
 import com.example.beechats.data.repositories.UserRepository;
 import com.example.beechats.utils.AppLifecycleObserver;
 import com.example.beechats.utils.ThemeHelper;
@@ -18,8 +16,6 @@ import com.google.firebase.auth.FirebaseUser;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Application class chính của BeeChat.
@@ -27,10 +23,7 @@ import java.util.concurrent.Executors;
  */
 public class BeeChatsApp extends Application {
     private static final String TAG = "BeeChatsApp";
-    private static final String PREFS_NAME = "beechats_app_prefs";
-    private static final String KEY_CONVERSATION_MIGRATION_DONE = "conversation_migration_done";
     private boolean isZegoServiceStarted = false;
-    private final ExecutorService appInitExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     public void onCreate() {
@@ -39,7 +32,6 @@ public class BeeChatsApp extends Application {
         FirebaseApp.initializeApp(this);
         registerLifecycleObserver();
         initCloudinary();
-        runStartupScripts();
         initZegoIfUserLoggedIn();
     }
 
@@ -60,34 +52,6 @@ public class BeeChatsApp extends Application {
         MediaManager.init(this, config);
     }
 
-    private void runStartupScripts() {
-        appInitExecutor.execute(() -> {
-            if (!isConversationMigrationDone()) {
-                new ConversationRepository().normalizeConversationData(new ConversationRepository.OnMigrationCallback() {
-                    @Override
-                    public void onSuccess(int updatedCount) {
-                        markConversationMigrationDone();
-                        Log.d(TAG, "Conversation migration completed. Updated " + updatedCount + " documents.");
-                    }
-
-                    @Override
-                    public void onError(String errorMessage) {
-                        Log.e(TAG, "Conversation migration failed", new RuntimeException(errorMessage));
-                    }
-                });
-            }
-        });
-    }
-
-    private boolean isConversationMigrationDone() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getBoolean(KEY_CONVERSATION_MIGRATION_DONE, false);
-    }
-
-    private void markConversationMigrationDone() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putBoolean(KEY_CONVERSATION_MIGRATION_DONE, true).apply();
-    }
 
     public void initZegoIfUserLoggedIn() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();

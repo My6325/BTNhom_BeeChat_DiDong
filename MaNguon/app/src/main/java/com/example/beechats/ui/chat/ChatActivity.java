@@ -393,7 +393,18 @@ public class ChatActivity extends AppCompatActivity {
                             messageRepository.markAsRead(conversationId, currentUserId,
                                     new MessageRepository.OnMessageStatusCallback() {
                                         @Override
-                                        public void onSuccess() { }
+                                        public void onSuccess() {
+                                            messageRepository.updateLastReadAt(conversationId, currentUserId,
+                                                    new MessageRepository.OnConversationReadCallback() {
+                                                        @Override
+                                                        public void onSuccess() { }
+
+                                                        @Override
+                                                        public void onError(String errorMessage) {
+                                                            Log.e(TAG, "Lỗi updateLastReadAt: " + errorMessage);
+                                                        }
+                                                    });
+                                        }
 
                                         @Override
                                         public void onError(String errorMessage) {
