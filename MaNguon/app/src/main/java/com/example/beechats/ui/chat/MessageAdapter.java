@@ -176,8 +176,10 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         public void bind(Message message, boolean isRead, boolean showAvatar, OnMediaClickListener mediaClickListener) {
+            resetState();
+
             if (message.isRecalled()) {
-                showText("Tin nhắn đã thu hồi");
+                showRecalledText("Tin nhắn đã thu hồi");
                 tvStatusText.setVisibility(View.GONE);
                 imgReadAvatar.setVisibility(View.GONE);
                 return;
@@ -201,12 +203,34 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
         }
 
+        private void resetState() {
+            tvMessage.setVisibility(View.VISIBLE);
+            tvMessage.setText("");
+            tvMessage.setAlpha(1.0f);
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
+
+            imgMessage.setVisibility(View.GONE);
+            imgMessage.setImageDrawable(null);
+
+            tvStatusText.setVisibility(View.GONE);
+            imgReadAvatar.setVisibility(View.GONE);
+            itemView.setOnClickListener(null);
+        }
+
         private void showText(String text) {
             tvMessage.setVisibility(View.VISIBLE);
             imgMessage.setVisibility(View.GONE);
             tvMessage.setText(text != null ? text : "");
             tvMessage.setAlpha(1.0f);
             tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
+        }
+
+        private void showRecalledText(String text) {
+            tvMessage.setVisibility(View.VISIBLE);
+            imgMessage.setVisibility(View.GONE);
+            tvMessage.setText(text != null ? text : "");
+            tvMessage.setAlpha(0.5f);
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.gray_dam));
         }
 
         private void showMedia(Message message, OnMediaClickListener mediaClickListener) {
@@ -225,8 +249,6 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
             if (mediaClickListener != null && "video".equals(message.getType())) {
                 itemView.setOnClickListener(v -> mediaClickListener.onVideoClick(finalMediaUrl));
-            } else {
-                itemView.setOnClickListener(null);
             }
         }
 
