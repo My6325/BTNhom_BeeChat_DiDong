@@ -125,7 +125,7 @@ public class MessageRepository {
         lastMessage.put("type", type.trim());
         lastMessage.put("timestamp", FieldValue.serverTimestamp());
         lastMessage.put("text", "text".equals(type) ? text.trim() : "");
-        lastMessage.put("content", getPreviewText(type));
+        lastMessage.put("content", "Đã gửi 1 tin nhắn");
         if (!"text".equals(type)) {
             lastMessage.put("mediaUrl", mediaUrl.trim());
         }
@@ -144,10 +144,7 @@ public class MessageRepository {
     }
 
     private String getPreviewText(String type) {
-        if ("image".equals(type)) return "Đã gửi một ảnh";
-        if ("video".equals(type)) return "Đã gửi một video";
-        if ("audio".equals(type)) return "Đã gửi một tin nhắn thoại";
-        return "Đã gửi một tệp";
+        return "Đã gửi 1 tin nhắn";
     }
 
     private String normalizeSenderName(String senderName) {
@@ -228,7 +225,7 @@ public class MessageRepository {
 
         Map<String, Object> lastMessage = new HashMap<>();
         lastMessage.put("text", text.trim());
-        lastMessage.put("content", "Đã gửi một tin nhắn");
+        lastMessage.put("content", "Đã gửi 1 tin nhắn");
         lastMessage.put("senderId", senderId.trim());
         lastMessage.put("senderName", normalizeSenderName(senderName));
         lastMessage.put("type", "text");

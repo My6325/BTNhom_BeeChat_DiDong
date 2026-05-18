@@ -168,14 +168,8 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
                 return;
             }
 
-            String previewText = lastMsg.getContent();
-            if (previewText == null || previewText.isEmpty()) {
-                previewText = lastMsg.getText();
-            }
-            if ((previewText == null || previewText.isEmpty()) && lastMsg.getType() != null) {
-                previewText = getPreviewText(lastMsg.getType());
-            }
-            txtMessage.setText(previewText != null ? previewText : "");
+            String previewText = "Đã gửi 1 tin nhắn";
+            txtMessage.setText(previewText);
 
             if (lastMsg.getSenderId() != null && lastMsg.getSenderId().equals(currentUserId)) {
                 txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
@@ -226,13 +220,6 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
                 intent.putExtra(ChatActivity.EXTRA_RECEIVER_NAME, txtUserName.getText().toString());
                 context.startActivity(intent);
             });
-        }
-
-        private String getPreviewText(String type) {
-            if ("text".equals(type)) return "Đã gửi 1 tin nhắn";
-            if ("image".equals(type) || "video".equals(type)) return "Đã gửi 1 tệp";
-            if ("audio".equals(type)) return "Đã gửi 1 tin nhắn thoại";
-            return "Đã gửi 1 tệp";
         }
 
         /**

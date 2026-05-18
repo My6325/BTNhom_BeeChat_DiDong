@@ -63,7 +63,7 @@ public class ChatActivity extends AppCompatActivity {
     private CallRepository callRepository;
     private UserRepository userRepository;
     private ListenerRegistration messageListener;
-    private ActivityResultLauncher<String> pickImageLauncher;
+    private ActivityResultLauncher<String> pickMediaLauncher;
 
     private String currentUserId;
     private String currentUserName;
@@ -104,7 +104,7 @@ public class ChatActivity extends AppCompatActivity {
         userRepository = new UserRepository();
 
         initViews();
-        setupImagePicker();
+        setupMediaPicker();
         setupRecyclerView();
         setupListeners();
 
@@ -129,7 +129,6 @@ public class ChatActivity extends AppCompatActivity {
         messageList = new ArrayList<>();
         messageAdapter = new MessageAdapter(messageList, currentUserId);
         messageAdapter.setConversationParticipants(currentUserId, receiverId);
-        messageAdapter.setConversationParticipants(currentUserId, receiverId);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true); // Hiển thị tin nhắn mới nhất ở dưới cùng
@@ -147,17 +146,17 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
 
-        btnPickImage.setOnClickListener(v -> pickImageLauncher.launch("image/*"));
+        btnPickImage.setOnClickListener(v -> pickMediaLauncher.launch("image/* video/*"));
         btnVoiceCall.setOnClickListener(v -> startZegoCall("voice"));
         btnVideoCall.setOnClickListener(v -> startZegoCall("video"));
     }
 
-    private void setupImagePicker() {
-        pickImageLauncher = registerForActivityResult(
+    private void setupMediaPicker() {
+        pickMediaLauncher = registerForActivityResult(
                 new ActivityResultContracts.GetContent(),
                 uri -> {
                     if (uri != null) {
-                        uploadImageAndSend(uri);
+                        handlePickedMedia(uri);
                     }
                 }
         );
@@ -188,10 +187,26 @@ public class ChatActivity extends AppCompatActivity {
                 });
     }
 
-    private void uploadImageAndSend(Uri uri) {
+    private void handlePickedMedia(Uri uri) {
+        String mimeType = getContentResolver().getType(uri);
+        if (mimeType == null) {
+            Toast.makeText(this, "Không xác định được loại tệp", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (mimeType.startsWith("image/")) {
+            uploadMediaAndSend(uri, "image");
+        } else if (mimeType.startsWith("video/")) {
+            uploadMediaAndSend(uri, "video");
+        } else {
+            Toast.makeText(this, "Chỉ hỗ trợ ảnh hoặc video", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void uploadMediaAndSend(Uri uri, String mediaType) {
         long fileSize = getFileSize(uri);
         if (fileSize > 100L * 1024L * 1024L) {
-            Toast.makeText(this, "Ảnh phải nhỏ hơn 100MB", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, mediaType.equals("video") ? "Video phải nhỏ hơn 100MB" : "Ảnh phải nhỏ hơn 100MB", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -200,7 +215,7 @@ public class ChatActivity extends AppCompatActivity {
                 .callback(new UploadCallback() {
                     @Override
                     public void onStart(String requestId) {
-                        Log.d(TAG, "Bắt đầu upload ảnh: " + requestId);
+                        Log.d(TAG, "Bắt đầu upload media: " + requestId);
                     }
 
                     @Override
@@ -208,15 +223,21 @@ public class ChatActivity extends AppCompatActivity {
 
                     @Override
                     public void onSuccess(String requestId, Map resultData) {
-                        String imageUrl = String.valueOf(resultData.get("secure_url"));
-                        sendImageMessage(imageUrl);
+                        String mediaUrl = String.valueOf(resultData.get("secure_url"));
+                        String thumbnailUrl = mediaType.equals("video") ? String.valueOf(resultData.get("thumbnail_url")) : null;
+                        Long duration = null;
+                        Object durationObj = resultData.get("duration");
+                        if (durationObj instanceof Number) {
+                            duration = ((Number) durationObj).longValue();
+                        }
+                        sendMediaMessage(mediaType, mediaUrl, thumbnailUrl, duration);
                     }
 
                     @Override
                     public void onError(String requestId, ErrorInfo error) {
-                        Log.e(TAG, "Upload ảnh thất bại: " + error.getDescription());
+                        Log.e(TAG, "Upload media thất bại: " + error.getDescription());
                         Toast.makeText(ChatActivity.this,
-                                "Upload ảnh thất bại", Toast.LENGTH_SHORT).show();
+                                "Upload media thất bại", Toast.LENGTH_SHORT).show();
                     }
 
                     @Override
@@ -274,26 +295,26 @@ public class ChatActivity extends AppCompatActivity {
         );
     }
 
-    private void sendImageMessage(String imageUrl) {
-        if (TextUtils.isEmpty(imageUrl)) {
-            Toast.makeText(this, "Không lấy được link ảnh", Toast.LENGTH_SHORT).show();
+    private void sendMediaMessage(String mediaType, String mediaUrl, String thumbnailUrl, Long duration) {
+        if (TextUtils.isEmpty(mediaUrl)) {
+            Toast.makeText(this, "Không lấy được link media", Toast.LENGTH_SHORT).show();
             return;
         }
 
         messageRepository.sendMediaMessage(conversationId, currentUserId, currentUserName,
-                "image", imageUrl, null, null,
+                mediaType, mediaUrl, thumbnailUrl, duration,
                 new MessageRepository.OnSendMessageCallback() {
                     @Override
                     public void onSuccess(String messageId) {
-                        Log.d(TAG, "Gửi ảnh thành công: " + messageId);
+                        Log.d(TAG, "Gửi media thành công: " + messageId);
                         resolveCurrentUserNameAndRefresh();
                     }
 
                     @Override
                     public void onError(String errorMessage) {
-                        Log.e(TAG, "Lỗi lưu ảnh vào Firestore: " + errorMessage);
+                        Log.e(TAG, "Lỗi lưu media vào Firestore: " + errorMessage);
                         Toast.makeText(ChatActivity.this,
-                                "Lưu ảnh thất bại", Toast.LENGTH_SHORT).show();
+                                "Lưu media thất bại", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
