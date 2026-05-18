@@ -71,24 +71,67 @@ public class FriendRepository {
             callback.onError("UID người dùng không hợp lệ.");
             return;
         }
-        if (fromUid.trim().equals(toUid.trim())) {
+        String senderId = fromUid.trim();
+        String receiverId = toUid.trim();
+        if (senderId.equals(receiverId)) {
             callback.onError("Không thể gửi lời mời cho chính mình.");
             return;
         }
 
-        DocumentReference requestRef = db.collection(FRIEND_REQUESTS).document();
-        String requestId = requestRef.getId();
+        db.collection(FRIENDS)
+                .document(senderId)
+                .collection(FRIEND_LIST)
+                .document(receiverId)
+                .get()
+                .addOnSuccessListener(friendDoc -> {
+                    if (friendDoc.exists()) {
+                        callback.onError("Hai bạn đã là bạn bè.");
+                        return;
+                    }
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("requestId", requestId);
-        data.put("senderId", fromUid.trim());
-        data.put("receiverId", toUid.trim());
-        data.put("status", "pending");
-        data.put("createdAt", FieldValue.serverTimestamp());
-        data.put("updatedAt", FieldValue.serverTimestamp());
+                    db.collection(FRIEND_REQUESTS)
+                            .whereEqualTo("senderId", senderId)
+                            .whereEqualTo("receiverId", receiverId)
+                            .whereEqualTo("status", "pending")
+                            .limit(1)
+                            .get()
+                            .addOnSuccessListener(outgoingSnapshot -> {
+                                if (!outgoingSnapshot.isEmpty()) {
+                                    callback.onError("Bạn đã gửi lời mời kết bạn rồi.");
+                                    return;
+                                }
 
-        requestRef.set(data)
-                .addOnSuccessListener(unused -> callback.onSuccess(requestId))
+                                db.collection(FRIEND_REQUESTS)
+                                        .whereEqualTo("senderId", receiverId)
+                                        .whereEqualTo("receiverId", senderId)
+                                        .whereEqualTo("status", "pending")
+                                        .limit(1)
+                                        .get()
+                                        .addOnSuccessListener(incomingSnapshot -> {
+                                            if (!incomingSnapshot.isEmpty()) {
+                                                callback.onError("Đã có lời mời kết bạn chờ xử lý từ người này.");
+                                                return;
+                                            }
+
+                                            DocumentReference requestRef = db.collection(FRIEND_REQUESTS).document();
+                                            String requestId = requestRef.getId();
+
+                                            Map<String, Object> data = new HashMap<>();
+                                            data.put("requestId", requestId);
+                                            data.put("senderId", senderId);
+                                            data.put("receiverId", receiverId);
+                                            data.put("status", "pending");
+                                            data.put("createdAt", FieldValue.serverTimestamp());
+                                            data.put("updatedAt", FieldValue.serverTimestamp());
+
+                                            requestRef.set(data)
+                                                    .addOnSuccessListener(unused -> callback.onSuccess(requestId))
+                                                    .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                                        })
+                                        .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                            })
+                            .addOnFailureListener(e -> callback.onError(e.getMessage()));
+                })
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
     }
 

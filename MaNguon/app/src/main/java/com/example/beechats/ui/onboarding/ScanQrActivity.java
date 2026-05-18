@@ -28,6 +28,7 @@ public class ScanQrActivity extends AppCompatActivity {
     private UserRepository userRepository;
     private FriendRepository friendRepository;
     private String currentUserId;
+    private boolean isProcessingScan = false;
 
     private final ActivityResultLauncher<String> cameraPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
@@ -77,6 +78,10 @@ public class ScanQrActivity extends AppCompatActivity {
     }
 
     private void handleScanResult(ScanIntentResult result) {
+        if (isProcessingScan) {
+            return;
+        }
+        isProcessingScan = true;
         QrScanInviteHelper.processQrScanForFriendInvite(
                 this,
                 result.getContents(),
@@ -84,6 +89,7 @@ public class ScanQrActivity extends AppCompatActivity {
                 userRepository,
                 friendRepository,
                 () -> {
+                    isProcessingScan = false;
                     if (!isFinishing()) {
                         finish();
                     }

@@ -45,6 +45,7 @@ public class QRCode_Activity extends AppCompatActivity {
     private FriendRepository friendRepository;
     private FirebaseUser currentUser;
     private String currentUserId;
+    private boolean isProcessingScan = false;
 
     private final ActivityResultLauncher<String> cameraPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
@@ -155,6 +156,9 @@ public class QRCode_Activity extends AppCompatActivity {
     }
 
     private void launchQrScanner() {
+        if (isProcessingScan) {
+            return;
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
             launchQrScannerInternal();
@@ -175,13 +179,25 @@ public class QRCode_Activity extends AppCompatActivity {
     }
 
     private void handleScanResult(ScanIntentResult result) {
+        if (isProcessingScan) {
+            return;
+        }
+        isProcessingScan = true;
+        btnScanQr.setEnabled(false);
         QrScanInviteHelper.processQrScanForFriendInvite(
                 this,
                 result.getContents(),
                 currentUserId,
                 userRepository,
                 friendRepository,
-                null);
+                this::releaseScanLock);
+    }
+
+    private void releaseScanLock() {
+        isProcessingScan = false;
+        if (btnScanQr != null) {
+            btnScanQr.setEnabled(true);
+        }
     }
 
     private String buildQrPayload(String userId) {
