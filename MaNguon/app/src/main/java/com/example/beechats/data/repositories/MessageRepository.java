@@ -137,7 +137,7 @@ public class MessageRepository {
         String messageId = msgRef.getId();
         WriteBatch batch = db.batch();
         batch.set(msgRef, msgData);
-        batch.update(convRef, convUpdate);
+        batch.set(convRef, convUpdate, com.google.firebase.firestore.SetOptions.merge());
         batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(messageId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
@@ -238,7 +238,7 @@ public class MessageRepository {
         String messageId = msgRef.getId();
         WriteBatch batch = db.batch();
         batch.set(msgRef, msgData);
-        batch.update(convRef, convUpdate);
+        batch.set(convRef, convUpdate, com.google.firebase.firestore.SetOptions.merge());
         batch.commit()
                 .addOnSuccessListener(unused -> callback.onSuccess(messageId))
                 .addOnFailureListener(e -> callback.onError(e.getMessage()));
