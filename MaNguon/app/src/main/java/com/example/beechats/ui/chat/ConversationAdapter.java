@@ -91,10 +91,12 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
 
         private void resetState() {
             txtUserName.setText("Không rõ");
+            txtUserName.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.getContext(), R.color.chat_conversation_title));
             txtMessage.setText("");
-            txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
+            txtMessage.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.getContext(), R.color.chat_conversation_preview_read));
             txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
             txtTime.setText("");
+            txtTime.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.getContext(), R.color.chat_text_tertiary));
             imgStatusRead.setVisibility(View.GONE);
             imgReadAvatar.setVisibility(View.GONE);
         }
@@ -172,10 +174,10 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
             txtMessage.setText(previewText);
 
             if (lastMsg.getSenderId() != null && lastMsg.getSenderId().equals(currentUserId)) {
-                txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
+                txtMessage.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.getContext(), R.color.chat_conversation_preview_read));
                 txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
             } else {
-                txtMessage.setTextColor(android.graphics.Color.parseColor("#000000"));
+                txtMessage.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.getContext(), R.color.chat_conversation_preview_unread));
                 txtMessage.setTypeface(null, android.graphics.Typeface.BOLD);
             }
         }

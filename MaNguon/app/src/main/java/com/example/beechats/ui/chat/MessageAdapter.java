@@ -207,7 +207,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             tvMessage.setVisibility(View.VISIBLE);
             tvMessage.setText("");
             tvMessage.setAlpha(1.0f);
-            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.chat_text_primary));
 
             imgMessage.setVisibility(View.GONE);
             imgMessage.setImageDrawable(null);
@@ -222,7 +222,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             imgMessage.setVisibility(View.GONE);
             tvMessage.setText(text != null ? text : "");
             tvMessage.setAlpha(1.0f);
-            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.chat_text_primary));
         }
 
         private void showRecalledText(String text) {
@@ -230,7 +230,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             imgMessage.setVisibility(View.GONE);
             tvMessage.setText(text != null ? text : "");
             tvMessage.setAlpha(0.5f);
-            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.gray_dam));
+            tvMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.chat_text_secondary));
         }
 
         private void showMedia(Message message, OnMediaClickListener mediaClickListener) {
@@ -273,7 +273,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 imgMessage.setVisibility(View.GONE);
                 txtMessage.setText("Tin nhắn đã thu hồi");
                 txtMessage.setAlpha(0.5f);
-                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.gray_dam));
+                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.chat_text_secondary));
                 return;
             }
 
@@ -299,7 +299,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 imgMessage.setVisibility(View.GONE);
                 txtMessage.setText(message.getText());
                 txtMessage.setAlpha(1.0f);
-                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.black));
+                txtMessage.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.chat_text_primary));
             }
         }
     }

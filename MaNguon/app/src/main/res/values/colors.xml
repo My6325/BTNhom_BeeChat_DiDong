@@ -13,4 +13,12 @@
     <color name="chat_bubble_border">#FFE08A</color>
     <color name="blue">#310DFD</color>
     <color name="qr_scan_icon">#FF000000</color>
+
+    <!-- Semantic colors cho UI chat/list để tách rõ light/dark theme -->
+    <color name="chat_text_primary">#FF000000</color>
+    <color name="chat_text_secondary">#FF595959</color>
+    <color name="chat_text_tertiary">#FF595959</color>
+    <color name="chat_conversation_preview_unread">#FF000000</color>
+    <color name="chat_conversation_preview_read">#FF565656</color>
+    <color name="chat_conversation_title">#FF000000</color>
 </resources>
