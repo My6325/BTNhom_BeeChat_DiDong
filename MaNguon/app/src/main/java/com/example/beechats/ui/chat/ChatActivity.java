@@ -125,6 +125,7 @@ public class ChatActivity extends AppCompatActivity {
     private void setupRecyclerView() {
         messageList = new ArrayList<>();
         messageAdapter = new MessageAdapter(messageList, currentUserId);
+        messageAdapter.setConversationParticipants(currentUserId, receiverId);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true); // Hiển thị tin nhắn mới nhất ở dưới cùng
@@ -312,6 +313,23 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    private boolean hasUnreadIncomingMessage(List<Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        for (Message message : messages) {
+            if (message == null) {
+                continue;
+            }
+            if (message.getSenderId() != null
+                    && !message.getSenderId().equals(currentUserId)
+                    && !"read".equals(message.getStatus())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void startListeningMessages() {
         Log.d(TAG, "Bắt đầu lắng nghe tin nhắn cho conversationId: " + conversationId);
 
@@ -331,17 +349,19 @@ public class ChatActivity extends AppCompatActivity {
                             recyclerViewChat.scrollToPosition(messageList.size() - 1);
                         }
 
-                        // Đánh dấu đã đọc khi mở cuộc hội thoại
-                        messageRepository.markAsRead(conversationId, currentUserId,
-                                new MessageRepository.OnMessageStatusCallback() {
-                                    @Override
-                                    public void onSuccess() { }
+                        // Chỉ đánh dấu đã đọc khi có tin nhắn do người khác gửi và tin nhắn chưa ở trạng thái read
+                        if (hasUnreadIncomingMessage(messages)) {
+                            messageRepository.markAsRead(conversationId, currentUserId,
+                                    new MessageRepository.OnMessageStatusCallback() {
+                                        @Override
+                                        public void onSuccess() { }
 
-                                    @Override
-                                    public void onError(String errorMessage) {
-                                        Log.e(TAG, "Lỗi markAsRead: " + errorMessage);
-                                    }
-                                });
+                                        @Override
+                                        public void onError(String errorMessage) {
+                                            Log.e(TAG, "Lỗi markAsRead: " + errorMessage);
+                                        }
+                                    });
+                        }
                     }
 
                     @Override

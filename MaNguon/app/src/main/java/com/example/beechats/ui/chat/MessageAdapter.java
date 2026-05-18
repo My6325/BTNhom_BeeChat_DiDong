@@ -31,6 +31,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     private final List<Message> messageList;
     private final String currentUserId;
+    private String peerUserId;
 
     // Vị trí tin nhắn cuối cùng do mình gửi mà đối phương đã đọc
     private int lastReadPosition = -1;
@@ -38,6 +39,11 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     public MessageAdapter(List<Message> messageList, String currentUserId) {
         this.messageList = messageList;
         this.currentUserId = currentUserId;
+    }
+
+    public void setConversationParticipants(String currentUserId, String peerUserId) {
+        this.peerUserId = peerUserId;
+        updateReadStatus();
     }
 
     /**
@@ -48,25 +54,28 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         lastReadPosition = -1;
         for (int i = messageList.size() - 1; i >= 0; i--) {
             Message msg = messageList.get(i);
-            if (msg.getSenderId() != null && msg.getSenderId().equals(currentUserId)) {
-                // Kiểm tra status == "read"
-                if ("read".equals(msg.getStatus())) {
-                    lastReadPosition = i;
-                    break;
-                }
-                // Kiểm tra readBy map có UID của đối phương
-                Map<String, Object> readBy = msg.getReadBy();
-                if (readBy != null) {
-                    for (String uid : readBy.keySet()) {
-                        if (!uid.equals(currentUserId)) {
-                            lastReadPosition = i;
-                            break;
-                        }
-                    }
-                    if (lastReadPosition >= 0) break;
-                }
+            if (msg == null || msg.getSenderId() == null || !msg.getSenderId().equals(currentUserId)) {
+                continue;
+            }
+            if (hasPeerReadMessage(msg)) {
+                lastReadPosition = i;
+                break;
             }
         }
+    }
+
+    private boolean hasPeerReadMessage(Message msg) {
+        if ("read".equals(msg.getStatus())) {
+            return true;
+        }
+        Map<String, Object> readBy = msg.getReadBy();
+        if (readBy == null || readBy.isEmpty()) {
+            return false;
+        }
+        if (peerUserId != null && readBy.containsKey(peerUserId)) {
+            return true;
+        }
+        return !readBy.containsKey(currentUserId) && !readBy.isEmpty();
     }
 
     @Override
@@ -97,25 +106,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         Message message = messageList.get(position);
 
-        boolean isRead = "read".equals(message.getStatus());
-        // Kiểm tra thêm readBy
-        if (!isRead && message.getReadBy() != null) {
-            // Nếu là người gửi, xem người nhận đã đọc chưa. 
-            // Nếu là người nhận, xem mình đã đọc chưa (hoặc người khác trong nhóm).
-            for (String uid : message.getReadBy().keySet()) {
-                if (holder.getItemViewType() == VIEW_TYPE_SENT) {
-                    if (!uid.equals(currentUserId)) {
-                        isRead = true;
-                        break;
-                    }
-                } else {
-                    if (uid.equals(currentUserId) || "read".equals(message.getStatus())) {
-                        isRead = true;
-                        break;
-                    }
-                }
-            }
-        }
+        boolean isRead = hasMessageBeenRead(message);
 
         if (holder.getItemViewType() == VIEW_TYPE_SENT) {
             boolean showAvatar = (position == lastReadPosition);
@@ -128,6 +119,26 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     @Override
     public int getItemCount() {
         return messageList != null ? messageList.size() : 0;
+    }
+
+    private boolean hasMessageBeenRead(Message message) {
+        if (message == null) {
+            return false;
+        }
+        if ("read".equals(message.getStatus())) {
+            return true;
+        }
+        Map<String, Object> readBy = message.getReadBy();
+        if (readBy == null || readBy.isEmpty()) {
+            return false;
+        }
+        if (message.getSenderId() != null && message.getSenderId().equals(currentUserId)) {
+            if (peerUserId != null && readBy.containsKey(peerUserId)) {
+                return true;
+            }
+            return readBy.size() > 1;
+        }
+        return readBy.containsKey(currentUserId);
     }
 
     // ─── ViewHolder cho tin nhắn GỬI ĐI (item_chat_user.xml) ───

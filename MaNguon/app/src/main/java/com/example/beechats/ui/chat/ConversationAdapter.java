@@ -18,9 +18,6 @@ import com.example.beechats.data.models.User;
 import com.example.beechats.data.repositories.UserRepository;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -111,15 +108,13 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
                 txtMessage.setText(lastMsg.getText());
                 
                 if (lastMsg.getSenderId() != null && lastMsg.getSenderId().equals(currentUserId)) {
-                    // Mình gửi tin nhắn cuối -> Chắc chắn mình đã đọc
                     txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
                     txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
-                    checkLastMessageReadStatus(conversation, otherUserId, true);
+                    applyReadState(true, true, otherUserId);
                 } else {
-                    // Người khác gửi -> Cần check xem mình đã đọc chưa (tạm để đen in đậm)
                     txtMessage.setTextColor(android.graphics.Color.parseColor("#000000"));
                     txtMessage.setTypeface(null, android.graphics.Typeface.BOLD);
-                    checkLastMessageReadStatus(conversation, otherUserId, false);
+                    applyReadState(false, false, otherUserId);
                 }
             } else {
                 txtMessage.setText("");
@@ -162,94 +157,38 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
             return otherUserId;
         }
 
-        /**
-         * Kiểm tra tin nhắn mới nhất đã được đọc chưa.
-         * Đổi màu text tin nhắn và cập nhật avatar nhỏ/chấm tròn (nếu mình gửi).
-         */
-        private void checkLastMessageReadStatus(Conversation conversation, String otherUserId, boolean isSentByMe) {
-            if (conversation.getConversationId() == null) return;
-
-            // Mặc định ẩn trạng thái
+        private void applyReadState(boolean isSentByMe, boolean isRead, String otherUserId) {
             imgStatusRead.setVisibility(View.GONE);
             imgReadAvatar.setVisibility(View.GONE);
 
-            // Query tin nhắn mới nhất trong conversation
-            FirebaseFirestore.getInstance()
-                    .collection("conversations")
-                    .document(conversation.getConversationId())
-                    .collection("messages")
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
-                    .limit(1)
-                    .get()
-                    .addOnSuccessListener(querySnapshot -> {
-                        if (querySnapshot.isEmpty()) return;
+            if (isRead) {
+                txtMessage.setTextColor(android.graphics.Color.parseColor("#565656"));
+                txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
+            } else {
+                txtMessage.setTextColor(android.graphics.Color.parseColor("#000000"));
+                txtMessage.setTypeface(null, android.graphics.Typeface.BOLD);
+            }
 
-                        DocumentSnapshot lastMsgDoc = querySnapshot.getDocuments().get(0);
-                        String status = lastMsgDoc.getString("status");
-
-                        // Kiểm tra xem MÌNH đã đọc chưa (để đổi màu text)
-                        boolean isReadByMe = false;
-                        if (isSentByMe) {
-                            isReadByMe = true;
-                        } else {
-                            if ("read".equals(status)) {
-                                isReadByMe = true;
-                            } else {
-                                Object readByObj = lastMsgDoc.get("readBy");
-                                if (readByObj instanceof java.util.Map) {
-                                    java.util.Map<String, Object> readBy = (java.util.Map<String, Object>) readByObj;
-                                    if (readBy.containsKey(currentUserId)) {
-                                        isReadByMe = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (isReadByMe) {
-                            txtMessage.setTextColor(android.graphics.Color.parseColor("#565656")); // Xám
-                            txtMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
-                        } else {
-                            txtMessage.setTextColor(android.graphics.Color.parseColor("#000000")); // Đen
-                            txtMessage.setTypeface(null, android.graphics.Typeface.BOLD);
-                        }
-
-                        // Nếu MÌNH gửi -> kiểm tra xem NGƯỜI NHẬN đã đọc chưa để hiện avatar/chấm tròn
-                        if (isSentByMe) {
-                            boolean isReadByOther = "read".equals(status);
-                            if (!isReadByOther) {
-                                Object readByObj = lastMsgDoc.get("readBy");
-                                if (readByObj instanceof java.util.Map) {
-                                    java.util.Map<String, Object> readBy = (java.util.Map<String, Object>) readByObj;
-                                    if (otherUserId != null && readBy.containsKey(otherUserId)) {
-                                        isReadByOther = true;
-                                    }
-                                }
+            if (isSentByMe) {
+                if (isRead) {
+                    imgReadAvatar.setVisibility(View.VISIBLE);
+                    if (otherUserId != null) {
+                        userRepository.getUser(otherUserId, new UserRepository.OnUserCallback() {
+                            @Override
+                            public void onSuccess(User user) {
+                                // Avatar read indicator sẽ dùng dữ liệu user nếu sau này cần hiển thị ảnh.
                             }
 
-                            if (isReadByOther) {
-                                // Đã đọc → hiện avatar nhỏ của người nhận
-                                imgStatusRead.setVisibility(View.GONE);
-                                imgReadAvatar.setVisibility(View.VISIBLE);
-
-                                // Load avatar người nhận
-                                if (otherUserId != null) {
-                                    userRepository.getUser(otherUserId, new UserRepository.OnUserCallback() {
-                                        @Override
-                                        public void onSuccess(User user) {
-                                            // TODO: Dùng Glide/Picasso load ảnh từ URL
-                                        }
-
-                                        @Override
-                                        public void onError(String errorMessage) {}
-                                    });
-                                }
-                            } else {
-                                // Chưa đọc (sent/delivered) → hiện chấm tròn
-                                imgStatusRead.setVisibility(View.VISIBLE);
+                            @Override
+                            public void onError(String errorMessage) {
                                 imgReadAvatar.setVisibility(View.GONE);
                             }
-                        }
-                    });
+                        });
+                    }
+                } else {
+                    imgStatusRead.setVisibility(View.VISIBLE);
+                }
+            }
         }
 
         /**
